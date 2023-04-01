@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/btnGoBack"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:id="@+id/llContent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:orientation="vertical">
+
+            <VideoView
+                android:id="@+id/vvVideoView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/ivMovieImage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_10sdp"
+                android:layout_marginTop="@dimen/_5sdp"
+                android:layout_marginEnd="@dimen/_10sdp"
+                android:adjustViewBounds="true"
+                android:contentDescription="@string/app_name"
+                android:scaleType="fitXY" />
+
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/_5sdp"
+                android:text="@string/title"
+                android:textAllCaps="true"
+                android:textColor="@android:color/background_dark"
+                android:textSize="@dimen/_15ssp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_5sdp"
+                android:textSize="@dimen/_13ssp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/_5sdp"
+                android:text="@string/year"
+                android:textAllCaps="true"
+                android:textColor="@android:color/background_dark"
+                android:textSize="@dimen/_15ssp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvYear"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_5sdp"
+                android:textSize="@dimen/_13ssp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/_5sdp"
+                android:text="@string/genre"
+                android:textAllCaps="true"
+                android:textColor="@android:color/background_dark"
+                android:textSize="@dimen/_15ssp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvGenre"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_5sdp"
+                android:textSize="@dimen/_13ssp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="@dimen/_5sdp"
+                android:text="@string/overview"
+                android:textAllCaps="true"
+                android:textColor="@android:color/background_dark"
+                android:textSize="@dimen/_15ssp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvOverview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/_15sdp"
+                android:layout_marginEnd="@dimen/_5sdp"
+                android:textSize="@dimen/_13ssp" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <ImageView
+        android:id="@+id/ivPlay"
+        android:layout_width="@dimen/_50sdp"
+        android:layout_height="@dimen/_50sdp"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="@dimen/_15sdp"
+        android:contentDescription="@string/app_name"
+        android:src="@android:drawable/ic_media_play"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btnGoBack"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="@dimen/_5sdp"
+        android:text="@string/back"
+        android:textAllCaps="true"
+        android:textSize="@dimen/_13ssp" />
+
+</RelativeLayout>
