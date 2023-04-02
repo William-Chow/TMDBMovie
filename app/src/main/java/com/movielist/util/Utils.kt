@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.util.Log
 import com.movielist.network.model.Genre
+import com.movielist.network.model.Movie
 import java.text.SimpleDateFormat
 import java.time.format.*
 import java.util.*
 import java.util.stream.Collectors
+
 
 class Utils {
 
@@ -58,6 +61,48 @@ class Utils {
         fun intent(context: Context, className: Class<*>?) {
             val intent = Intent(context, className)
             context.startActivity(intent)
+        }
+
+        fun generateGenresArrayString(genres: List<Genre>?): List<String> {
+            val genresList: MutableList<String> = ArrayList()
+            if (null != genres) {
+                val iterator = genres.listIterator()
+                genresList.add("All") // Add 'All' as first item
+                for (item in iterator) {
+                    item.name?.let { genresList.add(it) }
+                }
+            }
+            return genresList
+        }
+
+        fun generateNewGalleryList(
+            selectedGenre: String,
+            genreList: List<Genre>?,
+            movieList: List<Movie>?
+        ): List<Movie> {
+            var selectedID = 0
+            if (null != genreList) {
+                for (value in genreList) {
+                    if (value.name.equals(selectedGenre)) {
+                        selectedID = value.id!!
+                    }
+                }
+            }
+            val newMovieList: ArrayList<Movie> = ArrayList()
+            if (null != movieList) {
+                for (item in movieList) {
+                    val itemGenreList = item.genre_ids
+                    if (null != itemGenreList) {
+                        if (itemGenreList.contains(selectedID)) {
+                            newMovieList.add(item)
+                            Log.i("William", "Match adding to new list")
+                        }
+                    }
+                }
+            }
+            //Log.i("William", "" + newMovieList.size + " " + listOf(newMovieList))
+            //Log.i("William", " $selectedID$selectedGenre" + listOf(genreList))
+            return newMovieList
         }
     }
 }

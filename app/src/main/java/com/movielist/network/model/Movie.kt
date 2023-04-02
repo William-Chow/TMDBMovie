@@ -25,7 +25,7 @@ class Movie {
     var homepage: String? = null
 
     @SerializedName("genre_ids")
-    var genreIntList: List<Int>? = null
+    var genre_ids: List<Int>? = null
 
     @SerializedName("id")
     var id: Int? = null

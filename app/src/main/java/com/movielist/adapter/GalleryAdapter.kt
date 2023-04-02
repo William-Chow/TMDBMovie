@@ -1,5 +1,6 @@
 package com.movielist.adapter
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
@@ -15,10 +16,11 @@ import com.movielist.network.model.Movie
 import com.movielist.util.Utils
 
 class GalleryAdapter(
-    private val movieList: List<Movie>,
+    private var movieList: List<Movie>,
     private val context: Context
 ) : RecyclerView.Adapter<GalleryAdapter.CourseViewHolder>() {
 
+    var saveList: List<Movie> = emptyList()
     override fun onCreateViewHolder(
         parent: ViewGroup,
         viewType: Int
@@ -49,5 +51,25 @@ class GalleryAdapter(
         val llContent: LinearLayout = itemView.findViewById(R.id.llContent)
         val title: TextView = itemView.findViewById(R.id.ivMovieTitle)
         val imageIcon: ImageView = itemView.findViewById(R.id.ivMovieIcon)
+    }
+
+    fun getOriList(): List<Movie> {
+        return this.saveList
+    }
+
+    fun saveList(results: List<Movie>) {
+        this.saveList = results
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun initList() {
+        movieList = this.saveList
+        notifyDataSetChanged()
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateList(generateNewGalleryList: List<Movie>) {
+        movieList = generateNewGalleryList
+        notifyDataSetChanged()
     }
 }

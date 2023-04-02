@@ -28,7 +28,7 @@ interface MovieApi {
 
     // Ge Genre
     // genre/movie/list?api_key=1ee04cdd24bdc8497ec43f739fd3b5a5&language=en-US
-    @GET("genre/movie/list?api_key={api_key}&language=en-US")
+    @GET("genre/movie/list?language=en-US")
     fun getGenre(@Query("api_key") api_key: String): Call<Genres>
 
     // Get Video Key
