@@ -35,13 +35,16 @@ class Utils {
 
         @SuppressLint("SimpleDateFormat")
         fun getYear(date: String): Int {
-            val sdf = SimpleDateFormat("yyyy-MM-dd")
-            val parse: Date? = sdf.parse(date)
-            val c: Calendar = Calendar.getInstance()
-            if (parse != null) {
-                c.time = parse
+            if(date.isNotEmpty()) {
+                val sdf = SimpleDateFormat("yyyy-MM-dd")
+                val parse: Date? = sdf.parse(date)
+                val c: Calendar = Calendar.getInstance()
+                if (parse != null) {
+                    c.time = parse
+                }
+                return c.get(Calendar.YEAR)
             }
-            return c.get(Calendar.YEAR)
+            return 0
         }
 
         fun getGenres(genres: List<Genre>?): String {
