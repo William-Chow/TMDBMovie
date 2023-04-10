@@ -11,7 +11,7 @@ object RetrofitClient {
 
     // Base URL
     private const val BASE_URL = "https://api.themoviedb.org/3/"
-    const val API_KEY = "1ee04cdd24bdc8497ec43f739fd3b5a5";
+    const val API_KEY = "1ee04cdd24bdc8497ec43f739fd3b5a5"
 
     private val okHttpClient = OkHttpClient()
         .newBuilder()
