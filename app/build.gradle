@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace 'com.movielist'
+    namespace 'com.movielist.tmdb'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.movielist"
+        applicationId "com.movielist.tmdb"
         minSdk 28
         targetSdk 33
         versionCode 1

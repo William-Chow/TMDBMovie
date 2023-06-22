@@ -1,4 +1,4 @@
-package com.movielist
+package com.movielist.tmdb
 
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -15,11 +15,11 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.movielist.network.MovieApi
-import com.movielist.network.RetrofitClient
-import com.movielist.network.model.Movie
-import com.movielist.network.model.Videos
-import com.movielist.util.Utils
+import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.network.RetrofitClient
+import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.network.model.Videos
+import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

@@ -1,4 +1,4 @@
-package com.movielist
+package com.movielist.tmdb
 
 import android.os.Bundle
 import android.view.Menu
@@ -8,13 +8,13 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.movielist.adapter.GalleryAdapter
-import com.movielist.network.MovieApi
-import com.movielist.network.RetrofitClient
-import com.movielist.network.model.Genres
-import com.movielist.network.model.Movies
-import com.movielist.util.SharedPreferenceUtils
-import com.movielist.util.Utils
+import com.movielist.tmdb.adapter.GalleryAdapter
+import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.network.RetrofitClient
+import com.movielist.tmdb.network.model.Genres
+import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.util.SharedPreferenceUtils
+import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

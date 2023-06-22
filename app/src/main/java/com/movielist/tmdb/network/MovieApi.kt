@@ -1,6 +1,6 @@
-package com.movielist.network
+package com.movielist.tmdb.network
 
-import com.movielist.network.model.*
+import com.movielist.tmdb.network.model.*
 import retrofit2.Call
 import retrofit2.http.GET
 import retrofit2.http.Path

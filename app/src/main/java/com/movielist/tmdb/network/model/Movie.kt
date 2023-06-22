@@ -1,4 +1,4 @@
-package com.movielist.network.model
+package com.movielist.tmdb.network.model
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.google.gson.annotations.SerializedName

@@ -1,4 +1,4 @@
-package com.movielist.network
+package com.movielist.tmdb.network
 
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient

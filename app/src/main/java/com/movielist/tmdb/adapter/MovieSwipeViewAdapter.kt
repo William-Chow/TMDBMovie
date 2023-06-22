@@ -1,10 +1,10 @@
-package com.movielist.adapter
+package com.movielist.tmdb.adapter
 
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import com.movielist.network.model.Movie
-import com.movielist.ui.ViewPagerFragment
+import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.ui.ViewPagerFragment
 
 
 class MovieSwipeViewAdapter(fragmentActivity: FragmentActivity, private var movies: List<Movie>) :

@@ -1,4 +1,4 @@
-package com.movielist
+package com.movielist.tmdb
 
 import android.os.Bundle
 import android.view.Menu
@@ -10,11 +10,11 @@ import androidx.viewpager2.widget.ViewPager2
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.MobileAds
-import com.movielist.adapter.MovieSwipeViewAdapter
-import com.movielist.network.MovieApi
-import com.movielist.network.RetrofitClient
-import com.movielist.network.model.Movies
-import com.movielist.util.Utils
+import com.movielist.tmdb.adapter.MovieSwipeViewAdapter
+import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.network.RetrofitClient
+import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

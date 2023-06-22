@@ -1,4 +1,4 @@
-package com.movielist.adapter
+package com.movielist.tmdb.adapter
 
 import android.content.Context
 import android.view.LayoutInflater
@@ -9,10 +9,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.movielist.MovieActivity
-import com.movielist.R
-import com.movielist.network.model.Movie
-import com.movielist.util.Utils
+import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.MovieActivity
+import com.movielist.tmdb.R
+import com.movielist.tmdb.util.Utils
 
 class SearchAdapter(var context: Context, private var movieList: List<Movie>) :
     RecyclerView.Adapter<SearchAdapter.ViewHolder>() {

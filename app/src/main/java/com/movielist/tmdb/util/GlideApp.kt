@@ -1,4 +1,4 @@
-package com.movielist.util
+package com.movielist.tmdb.util
 
 import com.bumptech.glide.annotation.GlideModule
 import com.bumptech.glide.module.AppGlideModule

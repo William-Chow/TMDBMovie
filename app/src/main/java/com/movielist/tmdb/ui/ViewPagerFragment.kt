@@ -1,4 +1,4 @@
-package com.movielist.ui
+package com.movielist.tmdb.ui
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -11,10 +11,10 @@ import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
-import com.movielist.MovieActivity
-import com.movielist.R
-import com.movielist.network.model.Movie
-import com.movielist.util.Utils
+import com.movielist.tmdb.R
+import com.movielist.tmdb.MovieActivity
+import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.util.Utils
 
 class ViewPagerFragment(var movie: Movie) : Fragment() {
 

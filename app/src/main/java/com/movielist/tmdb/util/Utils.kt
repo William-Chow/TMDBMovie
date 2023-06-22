@@ -1,4 +1,4 @@
-package com.movielist.util
+package com.movielist.tmdb.util
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -6,8 +6,8 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.movielist.network.model.Genre
-import com.movielist.network.model.Movie
+import com.movielist.tmdb.network.model.Genre
+import com.movielist.tmdb.network.model.Movie
 import java.text.SimpleDateFormat
 import java.time.format.*
 import java.util.*

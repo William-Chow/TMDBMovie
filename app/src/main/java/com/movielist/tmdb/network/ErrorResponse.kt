@@ -1,4 +1,4 @@
-package com.movielist.network
+package com.movielist.tmdb.network
 
 import com.fasterxml.jackson.annotation.JsonProperty
 

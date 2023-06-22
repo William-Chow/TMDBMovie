@@ -1,11 +1,11 @@
-package com.movielist.util
+package com.movielist.tmdb.util
 
 import android.app.Activity
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.movielist.R
-import com.movielist.network.model.Genre
+import com.movielist.tmdb.R
+import com.movielist.tmdb.network.model.Genre
 import java.lang.reflect.Type
 
 
