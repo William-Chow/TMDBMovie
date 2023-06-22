@@ -1,5 +1,6 @@
 package com.movielist.tmdb.network
 
+import androidx.annotation.Keep
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -7,6 +8,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.jackson.JacksonConverterFactory
 import java.util.*
 
+@Keep
 object RetrofitClient {
 
     // Base URL

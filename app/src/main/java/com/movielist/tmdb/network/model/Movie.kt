@@ -60,8 +60,8 @@ class Movie {
     @SerializedName("revenue")
     var revenue: Long? = null
 
-    @SerializedName("runtime")
-    var runtime: Int? = null
+    // @SerializedName("runtime")
+    // var runtime: Int? = null
 
     @SerializedName("spoken_languages")
     var spoken_languages: List<SpokenLanguages>? = null

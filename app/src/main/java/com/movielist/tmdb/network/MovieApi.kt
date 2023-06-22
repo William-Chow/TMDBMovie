@@ -1,11 +1,13 @@
 package com.movielist.tmdb.network
 
+import androidx.annotation.Keep
 import com.movielist.tmdb.network.model.*
 import retrofit2.Call
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
 
+@Keep
 interface MovieApi {
 
     // Get Movie List
