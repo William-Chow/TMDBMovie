@@ -7,6 +7,14 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.movielist.network.MovieApi
 import com.movielist.network.RetrofitClient
 import com.movielist.network.model.Movie
@@ -18,6 +26,9 @@ import retrofit2.Response
 
 
 class MovieActivity : AppCompatActivity() {
+
+    private lateinit var mAdView : AdView
+    private var mInterstitialAd: InterstitialAd? = null
 
     lateinit var ivMovieImage: ImageView
     lateinit var tvTitle: TextView
@@ -32,6 +43,10 @@ class MovieActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_movie)
+
+        initAdmob()
+        admobBanner()
+        interstitial()
 
         ivMovieImage = findViewById(R.id.ivMovieImage)
         tvTitle = findViewById(R.id.tvTitle)
@@ -58,6 +73,39 @@ class MovieActivity : AppCompatActivity() {
                 ).show()
             }
         }
+    }
+
+    private fun initAdmob(){
+        MobileAds.initialize(this) { }
+    }
+
+    private fun admobBanner(){
+        mAdView = findViewById(R.id.adView)
+        mAdView.loadAd(AdRequest.Builder().build())
+    }
+
+    private fun interstitial(){
+        InterstitialAd.load(this,this@MovieActivity.getString(R.string.admob_interstitial_ad_unit_id), AdRequest.Builder().build(), object : InterstitialAdLoadCallback() {
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                mInterstitialAd = null
+            }
+
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                mInterstitialAd = interstitialAd
+                mInterstitialAd?.fullScreenContentCallback = object: FullScreenContentCallback() {
+                    override fun onAdDismissedFullScreenContent() {
+                        // Called when ad is dismissed.
+                        mInterstitialAd = null
+                    }
+
+                    override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                        // Called when ad fails to show.
+                        mInterstitialAd = null
+                    }
+                }
+                mInterstitialAd!!.show(this@MovieActivity)
+            }
+        })
     }
 
     private fun getMovie(movieID: Int) {

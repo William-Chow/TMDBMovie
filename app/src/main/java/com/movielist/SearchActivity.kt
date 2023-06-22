@@ -12,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.MobileAds
 import com.movielist.adapter.SearchAdapter
 import com.movielist.network.MovieApi
 import com.movielist.network.RetrofitClient
@@ -22,6 +25,8 @@ import retrofit2.Callback
 import retrofit2.Response
 
 class SearchActivity : AppCompatActivity() {
+
+    private lateinit var mAdView : AdView
 
     private lateinit var ivEmpty: ImageView
     private lateinit var searchRV: RecyclerView
@@ -35,6 +40,9 @@ class SearchActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
 
+        initAdmob()
+        admobBanner()
+
         ivEmpty = findViewById(R.id.ivEmpty)
         ivEmpty.visibility = View.VISIBLE
         searchRV = findViewById(R.id.rvSearch)
@@ -47,6 +55,15 @@ class SearchActivity : AppCompatActivity() {
         searchRV.layoutManager = LinearLayoutManager(this@SearchActivity)
         searchAdapter = SearchAdapter(this@SearchActivity, emptyList())
         searchRV.adapter = searchAdapter
+    }
+
+    private fun initAdmob(){
+        MobileAds.initialize(this) { }
+    }
+
+    private fun admobBanner(){
+        mAdView = findViewById(R.id.adView)
+        mAdView.loadAd(AdRequest.Builder().build())
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {

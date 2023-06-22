@@ -7,6 +7,9 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.MobileAds
 import com.movielist.adapter.MovieSwipeViewAdapter
 import com.movielist.network.MovieApi
 import com.movielist.network.RetrofitClient
@@ -18,6 +21,9 @@ import retrofit2.Response
 
 
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var mAdView : AdView
+
     private lateinit var viewPager: ViewPager2
     private lateinit var btnGallery: Button
 
@@ -28,6 +34,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        initAdmob()
+        admobBanner()
 
         viewPager = findViewById(R.id.vpMovieView)
         btnGallery = findViewById(R.id.btnGallery)
@@ -45,6 +54,15 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_SHORT
             ).show()
         }
+    }
+
+    private fun initAdmob(){
+        MobileAds.initialize(this) { }
+    }
+
+    private fun admobBanner(){
+        mAdView = findViewById(R.id.adView)
+        mAdView.loadAd(AdRequest.Builder().build())
     }
 
     private fun getMovies() {
