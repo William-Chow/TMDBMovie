@@ -36,7 +36,7 @@ class GalleryAdapter(
     override fun onBindViewHolder(holder: CourseViewHolder, position: Int) {
         holder.title.text = movieList[position].title
         Glide.with(context).load(Utils.imageURL + movieList[position].poster_path)
-            .placeholder(R.drawable.ic_no_exist).dontAnimate().into(holder.imageIcon)
+            .placeholder(R.drawable.ic_no_exist).dontAnimate().dontTransform().into(holder.imageIcon)
 
         holder.llContent.setOnClickListener {
             Utils.intent(context, movieList[position].id, MovieActivity::class.java)

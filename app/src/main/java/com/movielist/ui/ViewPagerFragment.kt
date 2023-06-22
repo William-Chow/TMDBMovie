@@ -43,7 +43,7 @@ class ViewPagerFragment(var movie: Movie) : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Glide.with(requireContext()).apply { requestOptions }
-            .load(Utils.imageURL + movie.poster_path).placeholder(R.drawable.ic_no_exist)
+            .load(Utils.imageURL + movie.poster_path).placeholder(R.drawable.ic_no_exist).dontTransform().fitCenter()
             .dontAnimate().into(ivMovieImage)
         tvTitle.text = movie.title
         rlContent.setOnClickListener {
