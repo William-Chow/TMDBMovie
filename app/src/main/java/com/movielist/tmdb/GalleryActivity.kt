@@ -4,7 +4,11 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.*
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.Spinner
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,7 +22,6 @@ import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import java.util.*
 
 class GalleryActivity : AppCompatActivity() {
 
@@ -139,6 +142,7 @@ class GalleryActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        super.onBackPressed()
         if (backPressedTime + 3000 > System.currentTimeMillis()) {
             onBackPressedDispatcher.onBackPressed()
             finish()
