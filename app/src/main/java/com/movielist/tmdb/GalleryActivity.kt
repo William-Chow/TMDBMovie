@@ -1,190 +1,213 @@
 package com.movielist.tmdb
 
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.Spinner
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.movielist.tmdb.adapter.GalleryAdapter
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import com.google.android.gms.ads.*
 import com.movielist.tmdb.network.MovieApi
 import com.movielist.tmdb.network.RetrofitClient
+import com.movielist.tmdb.network.model.Genre
 import com.movielist.tmdb.network.model.Genres
+import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.SharedPreferenceUtils
 import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
-class GalleryActivity : AppCompatActivity() {
-
-    private lateinit var spinner: Spinner
-    private lateinit var rvGalleryView: RecyclerView
-    private lateinit var btnSwipe: Button
+class GalleryActivity : ComponentActivity() {
 
     private lateinit var movieAPI: MovieApi
 
-    private var backPressedTime: Long = 0
-
-    private var genreDisplayList: List<String>? = null
-    var galleryAdapter: GalleryAdapter? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_gallery)
-
-        spinner = findViewById(R.id.spinner)
-        rvGalleryView = findViewById(R.id.rvGalleryView)
-        btnSwipe = findViewById(R.id.btnSwipe)
-
-        btnSwipe.setOnClickListener {
-            Utils.intent(this@GalleryActivity, MainActivity::class.java)
-        }
-
+        
+        initAdmob()
         movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
-        if (Utils.checkInternetConnection(this@GalleryActivity)) {
-            // Get from Shared Preference
-            genreDisplayList =
-                SharedPreferenceUtils.getArrayList(
-                    this@GalleryActivity,
-                    SharedPreferenceUtils.key_Genre_list
-                )
-            if (null == genreDisplayList) getGenre() else genreDisplayList?.let {
-                implementSpinner(
-                    it
-                )
+
+        setContent {
+            TMDBMovieTheme {
+                GalleryScreen()
             }
-            getMovies()
-        } else {
-            Toast.makeText(
-                this@GalleryActivity,
-                this@GalleryActivity.getString(R.string.no_internet_connection),
-                Toast.LENGTH_SHORT
-            ).show()
         }
     }
 
-    private fun getMovies() {
-        movieAPI.getDiscover(RetrofitClient.API_KEY, 1).enqueue(object : Callback<Movies> {
-            override fun onResponse(call: Call<Movies>, response: Response<Movies>) {
-                //val statusCode = response.code()
-                val movies: Movies? = response.body()
-                if (movies?.results != null) {
-                    val results = movies.results
-                    if (results?.size!! > 0) {
-                        val layoutManager = GridLayoutManager(this@GalleryActivity, 2)
-                        rvGalleryView.layoutManager = layoutManager
-                        galleryAdapter = GalleryAdapter(results, this@GalleryActivity)
-                        galleryAdapter?.saveList(results)
-                        rvGalleryView.adapter = galleryAdapter
+    private fun initAdmob() {
+        MobileAds.initialize(this) { }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun GalleryScreen() {
+        var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
+        var filteredMovies by remember { mutableStateOf<List<Movie>>(emptyList()) }
+        var genres by remember { mutableStateOf<List<Genre>>(emptyList()) }
+        var selectedGenre by remember { mutableStateOf("All") }
+        var isLoading by remember { mutableStateOf(true) }
+        var isMenuExpanded by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) {
+            fetchInitialData { fetchedMovies, fetchedGenres ->
+                movies = fetchedMovies
+                filteredMovies = fetchedMovies
+                genres = fetchedGenres
+                isLoading = false
+            }
+        }
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Gallery") },
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { Utils.intent(this@GalleryActivity, SearchActivity::class.java) }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    factory = { context ->
+                        AdView(context).apply {
+                            setAdSize(AdSize.BANNER)
+                            adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
+                            loadAd(AdRequest.Builder().build())
+                        }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                
+                // Genre Selector
+                Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                    OutlinedButton(
+                        onClick = { isMenuExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(selectedGenre)
+                    }
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("All") },
+                            onClick = {
+                                selectedGenre = "All"
+                                filteredMovies = movies
+                                isMenuExpanded = false
+                            }
+                        )
+                        genres.forEach { genre ->
+                            DropdownMenuItem(
+                                text = { Text(genre.name ?: "") },
+                                onClick = {
+                                    selectedGenre = genre.name ?: ""
+                                    filteredMovies = movies.filter { it.genre_ids?.contains(genre.id) == true }
+                                    isMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        contentPadding = PaddingValues(8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(filteredMovies) { movie ->
+                            GalleryItem(movie)
+                        }
                     }
                 }
             }
-
-            override fun onFailure(call: Call<Movies>, t: Throwable) {
-                Toast.makeText(this@GalleryActivity, t.message, Toast.LENGTH_SHORT).show()
-            }
-        })
+        }
     }
 
-    private fun getGenre() {
+    @Composable
+    fun GalleryItem(movie: Movie) {
+        Card(
+            modifier = Modifier
+                .padding(4.dp)
+                .fillMaxWidth()
+                .clickable { Utils.intent(this@GalleryActivity, movie.id, MovieActivity::class.java) },
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column {
+                AsyncImage(
+                    model = Utils.imageURL + movie.poster_path,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(220.dp),
+                    contentScale = ContentScale.Crop
+                )
+                Text(
+                    text = movie.title ?: "",
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+
+    private fun fetchInitialData(onComplete: (List<Movie>, List<Genre>) -> Unit) {
+        if (!Utils.checkInternetConnection(this)) return
+
         movieAPI.getGenre(RetrofitClient.API_KEY).enqueue(object : Callback<Genres> {
             override fun onResponse(call: Call<Genres>, response: Response<Genres>) {
-                //val statusCode = response.code()
-                val genres: Genres? = response.body()
-                if (null != genres) {
-                    val results = genres.genres
-                    if (results?.size!! > 0) {
-                        // Save ID and Name
-                        SharedPreferenceUtils.saveGenreArrayList(
-                            this@GalleryActivity,
-                            results,
-                            SharedPreferenceUtils.key_id_genre_list
-                        )
-                        genreDisplayList = Utils.generateGenresArrayString(results)
-                        // Store into Shared Preference
-                        SharedPreferenceUtils.saveArrayList(
-                            this@GalleryActivity,
-                            genreDisplayList,
-                            SharedPreferenceUtils.key_Genre_list
-                        )
-                        genreDisplayList?.let { implementSpinner(it) }
+                val genres = response.body()?.genres ?: emptyList()
+                
+                movieAPI.getDiscover(RetrofitClient.API_KEY, 1).enqueue(object : Callback<Movies> {
+                    override fun onResponse(call: Call<Movies>, response: Response<Movies>) {
+                        val movies = response.body()?.results ?: emptyList()
+                        onComplete(movies, genres)
                     }
-                }
+                    override fun onFailure(call: Call<Movies>, t: Throwable) {
+                        onComplete(emptyList(), genres)
+                    }
+                })
             }
-
             override fun onFailure(call: Call<Genres>, t: Throwable) {
-                Toast.makeText(this@GalleryActivity, t.message, Toast.LENGTH_SHORT).show()
+                onComplete(emptyList(), emptyList())
             }
         })
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        val inflater = menuInflater
-        inflater.inflate(R.menu.menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        val id = item.itemId
-
-        if (id == R.id.searchView) {
-            Utils.intent(this@GalleryActivity, SearchActivity::class.java)
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        super.onBackPressed()
-        if (backPressedTime + 3000 > System.currentTimeMillis()) {
-            onBackPressedDispatcher.onBackPressed()
-            finish()
-        } else {
-            Toast.makeText(this, "Press back again to leave the app.", Toast.LENGTH_LONG).show()
-        }
-        backPressedTime = System.currentTimeMillis()
-    }
-
-    private fun implementSpinner(genreDisplayList: List<String>) {
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item, genreDisplayList
-        )
-        spinner.adapter = adapter
-        spinner.onItemSelectedListener = object :
-            AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>,
-                view: View, position: Int, id: Long
-            ) {
-                if (position == 0 && genreDisplayList[position] == "All") {
-                    galleryAdapter?.initList()
-                } else {
-                    galleryAdapter?.updateList(
-                        Utils.generateNewGalleryList(
-                            genreDisplayList[position], SharedPreferenceUtils.getGenreArrayList(
-                                this@GalleryActivity,
-                                SharedPreferenceUtils.key_id_genre_list
-                            ), galleryAdapter?.getOriList()
-                        )
-                    )
-                }
-                Toast.makeText(
-                    this@GalleryActivity,
-                    "" + genreDisplayList[position], Toast.LENGTH_SHORT
-                ).show()
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>) {
-                // write code to perform some action
-            }
-        }
     }
 }

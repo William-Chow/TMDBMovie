@@ -1,149 +1,160 @@
 package com.movielist.tmdb
 
-import android.annotation.SuppressLint
 import android.os.Bundle
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.MobileAds
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.movielist.tmdb.network.MovieApi
 import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Movie
-import com.movielist.tmdb.network.model.Videos
+import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
+class MovieActivity : ComponentActivity() {
 
-class MovieActivity : AppCompatActivity() {
-
-    private lateinit var mAdView : AdView
     private var mInterstitialAd: InterstitialAd? = null
-
-    lateinit var ivMovieImage: ImageView
-    lateinit var tvTitle: TextView
-    lateinit var tvYear: TextView
-    lateinit var tvGenre: TextView
-    lateinit var tvOverview: TextView
-    lateinit var btnBackButton: Button
-
-    lateinit var movieAPI: MovieApi
-    private var requestOptions: RequestOptions? = null
+    private lateinit var movieAPI: MovieApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_movie)
+        
+        movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
+        val movieID = intent?.getIntExtra("movie", 0) ?: 0
 
         initAdmob()
-        admobBanner()
-        interstitial()
+        loadInterstitial()
 
-        ivMovieImage = findViewById(R.id.ivMovieImage)
-        tvTitle = findViewById(R.id.tvTitle)
-        tvYear = findViewById(R.id.tvYear)
-        tvGenre = findViewById(R.id.tvGenre)
-        tvOverview = findViewById(R.id.tvOverview)
-        btnBackButton = findViewById(R.id.btnGoBack)
-        btnBackButton.setOnClickListener {
-            finish()
-        }
-        requestOptions =
-            RequestOptions().diskCacheStrategy(DiskCacheStrategy.NONE).skipMemoryCache(true)
-        movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
-
-        val movieID = intent?.getIntExtra("movie", 0)
-        if (movieID != null && movieID != 0) {
-            if (Utils.checkInternetConnection(this@MovieActivity)) {
-                getMovie(movieID)
-            } else {
-                Toast.makeText(
-                    this@MovieActivity,
-                    this@MovieActivity.getString(R.string.no_internet_connection),
-                    Toast.LENGTH_SHORT
-                ).show()
+        setContent {
+            TMDBMovieTheme {
+                MovieDetailScreen(movieID)
             }
         }
     }
 
-    private fun initAdmob(){
+    private fun initAdmob() {
         MobileAds.initialize(this) { }
     }
 
-    private fun admobBanner(){
-        mAdView = findViewById(R.id.adView)
-        mAdView.loadAd(AdRequest.Builder().build())
-    }
-
-    private fun interstitial(){
-        InterstitialAd.load(this,this@MovieActivity.getString(R.string.admob_interstitial_ad_unit_id), AdRequest.Builder().build(), object : InterstitialAdLoadCallback() {
-            override fun onAdFailedToLoad(adError: LoadAdError) {
-                mInterstitialAd = null
-            }
-
-            override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                mInterstitialAd = interstitialAd
-                mInterstitialAd?.fullScreenContentCallback = object: FullScreenContentCallback() {
-                    override fun onAdDismissedFullScreenContent() {
-                        // Called when ad is dismissed.
-                        mInterstitialAd = null
-                    }
-
-                    override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                        // Called when ad fails to show.
-                        mInterstitialAd = null
-                    }
+    private fun loadInterstitial() {
+        val adRequest = AdRequest.Builder().build()
+        InterstitialAd.load(this, getString(R.string.admob_interstitial_ad_unit_id), adRequest,
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                    mInterstitialAd = interstitialAd
+                    mInterstitialAd?.show(this@MovieActivity)
                 }
-                mInterstitialAd!!.show(this@MovieActivity)
-            }
-        })
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    mInterstitialAd = null
+                }
+            })
     }
 
-    private fun getMovie(movieID: Int) {
-        movieAPI.getMovie(movieID, RetrofitClient.API_KEY).enqueue(object : Callback<Movie> {
-            @SuppressLint("SetTextI18n")
-            override fun onResponse(call: Call<Movie>, response: Response<Movie>) {
-                // val statusCode = response.code()
-                val movie: Movie? = response.body()
-                if (null != movie) {
-                    Glide.with(this@MovieActivity).apply { requestOptions }
-                        .load(Utils.imageURL + movie.poster_path)
-                        .placeholder(R.drawable.ic_no_exist).dontAnimate().into(ivMovieImage)
-                    tvTitle.text = movie.title
-                    tvYear.text =
-                        movie.release_date + " (" + movie.release_date?.let { Utils.getYear(it) } + ")"
-                    tvGenre.text = Utils.getGenres(movie.genres)
-                    tvOverview.text = movie.overview?.ifEmpty { "-" }
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun MovieDetailScreen(movieID: Int) {
+        var movie by remember { mutableStateOf<Movie?>(null) }
+        var isLoading by remember { mutableStateOf(true) }
+
+        LaunchedEffect(movieID) {
+            if (movieID != 0 && Utils.checkInternetConnection(this@MovieActivity)) {
+                movieAPI.getMovie(movieID, RetrofitClient.API_KEY).enqueue(object : Callback<Movie> {
+                    override fun onResponse(call: Call<Movie>, response: Response<Movie>) {
+                        movie = response.body()
+                        isLoading = false
+                    }
+                    override fun onFailure(call: Call<Movie>, t: Throwable) {
+                        isLoading = false
+                        Toast.makeText(this@MovieActivity, t.message, Toast.LENGTH_SHORT).show()
+                    }
+                })
+            }
+        }
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(movie?.title ?: "Movie Detail") },
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    factory = { context ->
+                        AdView(context).apply {
+                            setAdSize(AdSize.BANNER)
+                            adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
+                            loadAd(AdRequest.Builder().build())
+                        }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .padding(paddingValues)
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    AsyncImage(
+                        model = Utils.imageURL + movie?.poster_path,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(400.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(text = movie?.title ?: "", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        text = "${movie?.release_date} (${movie?.release_date?.let { Utils.getYear(it) }})",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = Utils.getGenres(movie?.genres),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = movie?.overview?.ifEmpty { "-" } ?: "-",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
-
-            override fun onFailure(call: Call<Movie>, t: Throwable) {
-                Toast.makeText(this@MovieActivity, t.message, Toast.LENGTH_SHORT).show()
-            }
-        })
-    }
-
-    private fun getVideo(movieID: Int) {
-        movieAPI.getVideo(movieID, RetrofitClient.API_KEY).enqueue(object : Callback<Videos> {
-            override fun onResponse(call: Call<Videos>, response: Response<Videos>) {
-                // val statusCode = response.code()
-                val videos: Videos? = response.body()
-                val results = videos?.results
-                // Video View no support youtube play link
-            }
-
-            override fun onFailure(call: Call<Videos>, t: Throwable) {
-                Toast.makeText(this@MovieActivity, t.message, Toast.LENGTH_SHORT).show()
-            }
-        })
+        }
     }
 }
