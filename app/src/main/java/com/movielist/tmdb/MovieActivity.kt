@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
 import coil.compose.AsyncImage
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
@@ -32,22 +33,40 @@ import retrofit2.Response
 class MovieActivity : ComponentActivity() {
 
     private var mInterstitialAd: InterstitialAd? = null
+    private var interstitialShown = false
     private lateinit var movieAPI: MovieApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
         val movieID = intent?.getIntExtra("movie", 0) ?: 0
 
+        // Survives configuration changes and process death, so a recreated
+        // activity never shows a second interstitial for the same visit.
+        interstitialShown = savedInstanceState?.getBoolean(STATE_INTERSTITIAL_SHOWN) == true
+
         initAdmob()
-        loadInterstitial()
+        if (!interstitialShown) {
+            loadInterstitial()
+        }
 
         setContent {
             TMDBMovieTheme {
                 MovieDetailScreen(movieID)
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_INTERSTITIAL_SHOWN, interstitialShown)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The ad may have finished loading while we were paused.
+        showInterstitialIfNeeded()
     }
 
     private fun initAdmob() {
@@ -60,12 +79,25 @@ class MovieActivity : ComponentActivity() {
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: InterstitialAd) {
                     mInterstitialAd = interstitialAd
-                    mInterstitialAd?.show(this@MovieActivity)
+                    // Only show from a live, resumed activity; a callback that
+                    // arrives while this instance is being torn down for a
+                    // configuration change is left for the new instance.
+                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        showInterstitialIfNeeded()
+                    }
                 }
                 override fun onAdFailedToLoad(adError: LoadAdError) {
                     mInterstitialAd = null
                 }
             })
+    }
+
+    private fun showInterstitialIfNeeded() {
+        if (interstitialShown) return
+        val ad = mInterstitialAd ?: return
+        interstitialShown = true
+        mInterstitialAd = null
+        ad.show(this)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -156,5 +188,9 @@ class MovieActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val STATE_INTERSTITIAL_SHOWN = "interstitial_shown"
     }
 }
