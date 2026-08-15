@@ -3,6 +3,7 @@ package com.movielist.tmdb
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
 import coil.compose.AsyncImage
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
@@ -34,6 +34,7 @@ class MovieActivity : ComponentActivity() {
 
     private var mInterstitialAd: InterstitialAd? = null
     private var interstitialShown = false
+    private var finishAfterInterstitial = false
     private lateinit var movieAPI: MovieApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,11 +46,17 @@ class MovieActivity : ComponentActivity() {
         // Survives configuration changes and process death, so a recreated
         // activity never shows a second interstitial for the same visit.
         interstitialShown = savedInstanceState?.getBoolean(STATE_INTERSTITIAL_SHOWN) == true
+        finishAfterInterstitial =
+            savedInstanceState?.getBoolean(STATE_FINISH_AFTER_INTERSTITIAL) == true
 
         initAdmob()
         if (!interstitialShown) {
             loadInterstitial()
         }
+
+        // The ad is shown on the way out, so the system back gesture has to
+        // take the same path as the toolbar back button.
+        onBackPressedDispatcher.addCallback(this) { leaveScreen() }
 
         setContent {
             TMDBMovieTheme {
@@ -61,12 +68,17 @@ class MovieActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(STATE_INTERSTITIAL_SHOWN, interstitialShown)
+        outState.putBoolean(STATE_FINISH_AFTER_INTERSTITIAL, finishAfterInterstitial)
     }
 
     override fun onResume() {
         super.onResume()
-        // The ad may have finished loading while we were paused.
-        showInterstitialIfNeeded()
+        // Resumed after the interstitial was dismissed — covers the case where
+        // a configuration change replaced the instance that showed it, leaving
+        // its fullScreenContentCallback pointing at a dead activity.
+        if (finishAfterInterstitial && !isFinishing) {
+            finish()
+        }
     }
 
     private fun initAdmob() {
@@ -78,13 +90,8 @@ class MovieActivity : ComponentActivity() {
         InterstitialAd.load(this, getString(R.string.admob_interstitial_ad_unit_id), adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                    // Held until the user leaves the screen; see leaveScreen().
                     mInterstitialAd = interstitialAd
-                    // Only show from a live, resumed activity; a callback that
-                    // arrives while this instance is being torn down for a
-                    // configuration change is left for the new instance.
-                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                        showInterstitialIfNeeded()
-                    }
                 }
                 override fun onAdFailedToLoad(adError: LoadAdError) {
                     mInterstitialAd = null
@@ -92,11 +99,25 @@ class MovieActivity : ComponentActivity() {
             })
     }
 
-    private fun showInterstitialIfNeeded() {
-        if (interstitialShown) return
-        val ad = mInterstitialAd ?: return
+    /**
+     * Exits the screen, showing the interstitial on the way out if one is
+     * ready. Leaving is a deliberate transition, so the ad never interrupts
+     * the user mid-read.
+     */
+    private fun leaveScreen() {
+        val ad = mInterstitialAd
+        if (interstitialShown || ad == null) {
+            // Never hold the user on the screen waiting for an ad to load.
+            finish()
+            return
+        }
         interstitialShown = true
+        finishAfterInterstitial = true
         mInterstitialAd = null
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() = finish()
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) = finish()
+        }
         ad.show(this)
     }
 
@@ -126,7 +147,7 @@ class MovieActivity : ComponentActivity() {
                 TopAppBar(
                     title = { Text(movie?.title ?: "Movie Detail") },
                     navigationIcon = {
-                        IconButton(onClick = { finish() }) {
+                        IconButton(onClick = { leaveScreen() }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                         }
                     }
@@ -192,5 +213,6 @@ class MovieActivity : ComponentActivity() {
 
     private companion object {
         const val STATE_INTERSTITIAL_SHOWN = "interstitial_shown"
+        const val STATE_FINISH_AFTER_INTERSTITIAL = "finish_after_interstitial"
     }
 }
