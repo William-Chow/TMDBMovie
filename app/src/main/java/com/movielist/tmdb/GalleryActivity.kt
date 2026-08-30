@@ -1,50 +1,55 @@
 package com.movielist.tmdb
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
-import com.google.android.gms.ads.*
-import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Genre
-import com.movielist.tmdb.network.model.Genres
 import com.movielist.tmdb.network.model.Movie
-import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.EmptyState
+import com.movielist.tmdb.ui.components.ErrorState
+import com.movielist.tmdb.ui.components.LoadingState
+import com.movielist.tmdb.ui.components.PageErrorRow
+import com.movielist.tmdb.ui.components.PageLoadingRow
+import com.movielist.tmdb.ui.rememberMoviePager
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
-import com.movielist.tmdb.util.SharedPreferenceUtils
 import com.movielist.tmdb.util.Utils
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+
+/** Items left below the fold before the next page is requested. */
+private const val PREFETCH_DISTANCE = 6
 
 class GalleryActivity : ComponentActivity() {
 
-    private lateinit var movieAPI: MovieApi
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        initAdmob()
-        movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
+
+        AdsConsentManager.refresh(this)
 
         setContent {
             TMDBMovieTheme {
@@ -53,67 +58,84 @@ class GalleryActivity : ComponentActivity() {
         }
     }
 
-    private fun initAdmob() {
-        MobileAds.initialize(this) { }
-    }
-
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun GalleryScreen() {
-        var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
-        var filteredMovies by remember { mutableStateOf<List<Movie>>(emptyList()) }
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+
         var genres by remember { mutableStateOf<List<Genre>>(emptyList()) }
-        var selectedGenre by remember { mutableStateOf("All") }
-        var isLoading by remember { mutableStateOf(true) }
+        // null means "All" — no with_genres filter is sent at all.
+        var selectedGenre by remember { mutableStateOf<Genre?>(null) }
         var isMenuExpanded by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
-            fetchInitialData { fetchedMovies, fetchedGenres ->
-                movies = fetchedMovies
-                filteredMovies = fetchedMovies
-                genres = fetchedGenres
-                isLoading = false
+            genres = try {
+                RetrofitClient.movieApi.getGenre(RetrofitClient.API_KEY).genres.orEmpty()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                // The filter is a convenience; losing it must not cost the grid.
+                emptyList()
             }
         }
+
+        // Filtering happens on the server, so a genre with few recent releases
+        // still fills the grid instead of returning whatever the first page held.
+        val pager = rememberMoviePager(selectedGenre?.id) { page ->
+            RetrofitClient.movieApi.getDiscover(RetrofitClient.API_KEY, page, selectedGenre?.id)
+        }
+        val gridState = rememberLazyGridState()
+
+        LaunchedEffect(pager) {
+            // A new genre is a new list; don't leave the user mid-scroll in it.
+            gridState.scrollToItem(0)
+            pager.loadNext(context)
+        }
+
+        val lastVisibleIndex by remember(gridState) {
+            derivedStateOf { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+        }
+        LaunchedEffect(lastVisibleIndex, pager.movies.size) {
+            if (pager.movies.isNotEmpty() &&
+                lastVisibleIndex >= pager.movies.size - PREFETCH_DISTANCE
+            ) {
+                pager.loadNext(context)
+            }
+        }
+
+        val selectedGenreName = selectedGenre?.name ?: stringResource(R.string.genre_all)
 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Gallery") },
+                    title = { Text(stringResource(R.string.gallery)) },
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back)
+                            )
                         }
                     },
                     actions = {
                         IconButton(onClick = { Utils.intent(this@GalleryActivity, SearchActivity::class.java) }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
                         }
                     }
                 )
             },
-            bottomBar = {
-                AndroidView(
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    factory = { context ->
-                        AdView(context).apply {
-                            setAdSize(AdSize.BANNER)
-                            adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
-                            loadAd(AdRequest.Builder().build())
-                        }
-                    }
-                )
-            }
+            bottomBar = { AdBanner() }
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                
+
                 // Genre Selector
                 Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                     OutlinedButton(
                         onClick = { isMenuExpanded = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(selectedGenre)
+                        Text(selectedGenreName)
                     }
                     DropdownMenu(
                         expanded = isMenuExpanded,
@@ -121,10 +143,9 @@ class GalleryActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("All") },
+                            text = { Text(stringResource(R.string.genre_all)) },
                             onClick = {
-                                selectedGenre = "All"
-                                filteredMovies = movies
+                                selectedGenre = null
                                 isMenuExpanded = false
                             }
                         )
@@ -132,8 +153,7 @@ class GalleryActivity : ComponentActivity() {
                             DropdownMenuItem(
                                 text = { Text(genre.name ?: "") },
                                 onClick = {
-                                    selectedGenre = genre.name ?: ""
-                                    filteredMovies = movies.filter { it.genre_ids?.contains(genre.id) == true }
+                                    selectedGenre = genre
                                     isMenuExpanded = false
                                 }
                             )
@@ -141,18 +161,47 @@ class GalleryActivity : ComponentActivity() {
                     }
                 }
 
-                if (isLoading) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(filteredMovies) { movie ->
-                            GalleryItem(movie)
+                PullToRefreshBox(
+                    isRefreshing = pager.isRefreshing,
+                    onRefresh = { scope.launch { pager.refresh(context) } },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    when {
+                        pager.isLoadingFirstPage -> LoadingState()
+
+                        pager.movies.isEmpty() && pager.error != null -> ErrorState(
+                            message = pager.error!!,
+                            onRetry = { scope.launch { pager.retry(context) } }
+                        )
+
+                        pager.movies.isEmpty() -> EmptyState(
+                            message = if (selectedGenre == null) {
+                                stringResource(R.string.no_movies)
+                            } else {
+                                stringResource(R.string.no_movies_in_genre, selectedGenreName)
+                            }
+                        )
+
+                        else -> LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            state = gridState,
+                            contentPadding = PaddingValues(8.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(pager.movies) { movie ->
+                                GalleryItem(movie)
+                            }
+                            if (pager.isLoading) {
+                                item(span = { GridItemSpan(maxLineSpan) }) { PageLoadingRow() }
+                            }
+                            pager.error?.let { message ->
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    PageErrorRow(
+                                        message = message,
+                                        onRetry = { scope.launch { pager.retry(context) } }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -174,7 +223,9 @@ class GalleryActivity : ComponentActivity() {
                     model = Utils.imageURL + movie.poster_path,
                     contentDescription = null,
                     modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(R.drawable.ic_no_exist),
+                    error = painterResource(R.drawable.ic_no_exist)
                 )
                 Text(
                     text = movie.title ?: "",
@@ -186,28 +237,5 @@ class GalleryActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    private fun fetchInitialData(onComplete: (List<Movie>, List<Genre>) -> Unit) {
-        if (!Utils.checkInternetConnection(this)) return
-
-        movieAPI.getGenre(RetrofitClient.API_KEY).enqueue(object : Callback<Genres> {
-            override fun onResponse(call: Call<Genres>, response: Response<Genres>) {
-                val genres = response.body()?.genres ?: emptyList()
-                
-                movieAPI.getDiscover(RetrofitClient.API_KEY, 1).enqueue(object : Callback<Movies> {
-                    override fun onResponse(call: Call<Movies>, response: Response<Movies>) {
-                        val movies = response.body()?.results ?: emptyList()
-                        onComplete(movies, genres)
-                    }
-                    override fun onFailure(call: Call<Movies>, t: Throwable) {
-                        onComplete(emptyList(), genres)
-                    }
-                })
-            }
-            override fun onFailure(call: Call<Genres>, t: Throwable) {
-                onComplete(emptyList(), emptyList())
-            }
-        })
     }
 }

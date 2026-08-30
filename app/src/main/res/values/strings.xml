@@ -1,20 +1,52 @@
 <resources>
     <string name="app_name">TMDB Movie</string>
 
-    <string name="action_search">search</string>
+    <!-- Screens -->
+    <string name="gallery">Gallery</string>
+    <string name="gallery_view">GALLERY VIEW</string>
+    <string name="movie_detail">Movie Detail</string>
+    <string name="favorites">Favorites</string>
+
+    <!-- Actions -->
     <string name="search">Search</string>
     <string name="back">Back</string>
-    <string name="title">Title</string>
-    <string name="year">Year</string>
-    <string name="genre">Genre</string>
+    <string name="clear">Clear</string>
+    <string name="retry">Retry</string>
+    <string name="watch_trailer">Watch Trailer</string>
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="filter_by_genre">Filter by genre</string>
+    <string name="genre_all">All</string>
+
+    <!-- Movie detail -->
     <string name="overview">Overview</string>
-    <string name="gallery_view">Gallery View</string>
-    <string name="swipe_view">Swipe View</string>
+    <string name="cast">Cast</string>
+    <string name="release_and_year">%1$s (%2$d)</string>
+    <string name="not_available">-</string>
 
+    <!-- Search -->
+    <string name="search_hint">Search movies…</string>
+    <string name="search_prompt">Search for your favorite movies</string>
+    <string name="search_no_results">No movies match “%1$s”</string>
+
+    <!-- Empty / error states -->
+    <string name="no_movies">No movies to show right now</string>
+    <string name="no_favorites">No saved movies yet. Tap the heart on a movie to save it.</string>
+    <string name="no_movies_in_genre">No movies found in %1$s</string>
     <string name="no_internet_connection">No Internet Connection. Please Try Again.</string>
-    <string name="done">Done</string>
+    <string name="error_unreachable">Couldn\'t reach the server. Please try again.</string>
+    <string name="error_server">The server returned an error (%1$d). Please try again.</string>
+    <string name="error_unknown">Something went wrong. Please try again.</string>
+    <string name="error_no_browser">No app available to open this link.</string>
+    <string name="error_movie_unavailable">This movie could not be loaded.</string>
+    <string name="press_back_again">Press back again to leave the app.</string>
 
+    <!-- AdMob -->
     <string name="admob_id">ca-app-pub-4541063798492496~7778027755</string>
     <string name="admob_banner_ad_unit_id">ca-app-pub-4541063798492496/9305326872</string>
     <string name="admob_interstitial_ad_unit_id">ca-app-pub-4541063798492496/3290582868</string>
+    <plurals name="rating_votes">
+        <item quantity="one">%1$.1f / 10 (%2$d vote)</item>
+        <item quantity="other">%1$.1f / 10 (%2$d votes)</item>
+    </plurals>
 </resources>

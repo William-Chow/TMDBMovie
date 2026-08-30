@@ -1,8 +1,11 @@
 package com.movielist.tmdb.network
 
 import androidx.annotation.Keep
-import com.movielist.tmdb.network.model.*
-import retrofit2.Call
+import com.movielist.tmdb.network.model.Credits
+import com.movielist.tmdb.network.model.Genres
+import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.network.model.Videos
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -11,30 +14,41 @@ import retrofit2.http.Query
 interface MovieApi {
 
     // Get Movie List
-    @GET("discover/movie?sort_by=release_date.desc&include_adult=true&include_video=true")
-    fun getDiscover(@Query("api_key") api_key: String, @Query("page") page: Int): Call<Movies>
+    // discover/movie?api_key={api_key}&page=1&with_genres=28
+    @GET("discover/movie?sort_by=release_date.desc&include_adult=false&include_video=true")
+    suspend fun getDiscover(
+        @Query("api_key") api_key: String,
+        @Query("page") page: Int,
+        // Omitted from the query string when null, which asks for every genre.
+        @Query("with_genres") with_genres: Int?
+    ): Movies
 
     // Get Movie Item
     // movie/76600?api_key={api_key}&language=en-US
     @GET("movie/{movie_id}?language=en-US")
-    fun getMovie(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Call<Movie>
+    suspend fun getMovie(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Movie
 
     // Get Search
     // search/movie?api_key={api_key}&language=en-US
     @GET("search/movie?language=en-US")
-    fun getSearch(
+    suspend fun getSearch(
         @Query("api_key") api_key: String,
         @Query("query") query: String,
         @Query("page") page: Int
-    ): Call<Movies>
+    ): Movies
 
-    // Ge Genre
-    // genre/movie/list?api_key=1ee04cdd24bdc8497ec43f739fd3b5a5&language=en-US
+    // Get Genre
+    // genre/movie/list?api_key={api_key}&language=en-US
     @GET("genre/movie/list?language=en-US")
-    fun getGenre(@Query("api_key") api_key: String): Call<Genres>
+    suspend fun getGenre(@Query("api_key") api_key: String): Genres
+
+    // Get Cast & Crew
+    // movie/76600/credits?api_key={api_key}&language=en-US
+    @GET("movie/{movie_id}/credits?language=en-US")
+    suspend fun getCredits(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Credits
 
     // Get Video Key
-    // movie/76600/videos?api_key=1ee04cdd24bdc8497ec43f739fd3b5a5&language=en-US
-    @GET("movie/{movie_id}}/videos?language=en-US")
-    fun getVideo(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Call<Videos>
+    // movie/76600/videos?api_key={api_key}&language=en-US
+    @GET("movie/{movie_id}/videos?language=en-US")
+    suspend fun getVideo(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Videos
 }

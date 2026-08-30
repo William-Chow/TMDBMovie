@@ -10,6 +10,14 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// The TMDB key lives in local.properties, which is not tracked. A checkout
+// without one still builds; requests then fail with a plain 401.
+def localPropertiesFile = rootProject.file("local.properties")
+def localProperties = new Properties()
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
 android {
     namespace 'com.movielist.tmdb'
     compileSdk = 37
@@ -22,6 +30,9 @@ android {
         versionName "3.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "String", "TMDB_API_KEY",
+                "\"${localProperties.getProperty('tmdb.apiKey', '')}\""
     }
 
     /*
@@ -50,28 +61,26 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
 }
 
 dependencies {
 
-    implementation libs.appcompat
     implementation libs.material
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
     implementation libs.core.ktx
-
-    implementation libs.constraintlayout
 
     // Compose
     implementation platform(libs.androidx.compose.bom)
@@ -86,21 +95,8 @@ dependencies {
 
     //Retrofit
     implementation libs.retrofit
-    implementation libs.converter.gson
     implementation libs.converter.jackson
-    //Glide
-    implementation libs.glide
-
-    // Padding / Margin
-    implementation libs.sdp.android
-    // Text Size
-    implementation libs.ssp.android
-
-    // Import the Firebase BoM
-    implementation platform(libs.firebase.bom)
 
     // Admob
     implementation libs.play.services.ads
-
-
 }

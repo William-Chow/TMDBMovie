@@ -10,44 +10,53 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
-import com.google.android.gms.ads.*
-import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Movie
-import com.movielist.tmdb.network.model.Movies
+import com.movielist.tmdb.ui.MoviePager
+import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.EmptyState
+import com.movielist.tmdb.ui.components.ErrorState
+import com.movielist.tmdb.ui.components.LoadingState
+import com.movielist.tmdb.ui.rememberMoviePager
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import kotlinx.coroutines.launch
+
+/** Pages left ahead of the user before the next page is requested. */
+private const val PREFETCH_DISTANCE = 3
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var movieAPI: MovieApi
     private var backPressedTime: Long = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        initAdmob()
-        movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
+        // Launcher activity, so this is where the app asks for ad consent.
+        // Nothing is requested from AdMob until that comes back positive.
+        AdsConsentManager.gatherConsent(this)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (backPressedTime + 3000 > System.currentTimeMillis()) {
                     finish()
                 } else {
-                    Toast.makeText(this@MainActivity, "Press back again to leave the app.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, R.string.press_back_again, Toast.LENGTH_LONG).show()
                     backPressedTime = System.currentTimeMillis()
                 }
             }
@@ -60,82 +69,98 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun initAdmob() {
-        MobileAds.initialize(this) { }
-    }
-
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MainScreen() {
-        var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
-        var isLoading by remember { mutableStateOf(true) }
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val pager = rememberMoviePager(Unit) { page ->
+            RetrofitClient.movieApi.getDiscover(RetrofitClient.API_KEY, page, null)
+        }
 
-        LaunchedEffect(Unit) {
-            if (Utils.checkInternetConnection(this@MainActivity)) {
-                movieAPI.getDiscover(RetrofitClient.API_KEY, 1).enqueue(object : Callback<Movies> {
-                    override fun onResponse(call: Call<Movies>, response: Response<Movies>) {
-                        movies = response.body()?.results ?: emptyList()
-                        isLoading = false
-                    }
+        LaunchedEffect(pager) { pager.loadNext(context) }
 
-                    override fun onFailure(call: Call<Movies>, t: Throwable) {
-                        isLoading = false
-                        Toast.makeText(this@MainActivity, t.message, Toast.LENGTH_SHORT).show()
-                    }
-                })
-            } else {
-                isLoading = false
-                Toast.makeText(this@MainActivity, getString(R.string.no_internet_connection), Toast.LENGTH_SHORT).show()
+        // A page that fails after the first one leaves the loaded movies on
+        // screen, so the failure is reported without replacing them. Clearing
+        // it afterwards matters: the pager refuses to load while an error is
+        // pending, and in a carousel there is no error row to retry from.
+        LaunchedEffect(pager.error) {
+            val error = pager.error
+            if (error != null && pager.movies.isNotEmpty()) {
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                pager.dismissError()
             }
         }
 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("TMDB Movie") },
+                    title = { Text(stringResource(R.string.app_name)) },
                     actions = {
+                        IconButton(onClick = { Utils.intent(this@MainActivity, FavoritesActivity::class.java) }) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = stringResource(R.string.favorites)
+                            )
+                        }
                         IconButton(onClick = { Utils.intent(this@MainActivity, SearchActivity::class.java) }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
                         }
                     }
                 )
             },
             bottomBar = {
                 Column {
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        factory = { context ->
-                            AdView(context).apply {
-                                setAdSize(AdSize.BANNER)
-                                adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
-                                loadAd(AdRequest.Builder().build())
-                            }
-                        }
-                    )
+                    AdBanner()
                     Button(
                         onClick = { Utils.intent(this@MainActivity, GalleryActivity::class.java) },
                         modifier = Modifier.fillMaxWidth().padding(8.dp)
                     ) {
-                        Text("GALLERY VIEW")
+                        Text(stringResource(R.string.gallery_view))
                     }
                 }
             }
         ) { paddingValues ->
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                val pagerState = rememberPagerState(pageCount = { movies.size })
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 32.dp)
-                ) { page ->
-                    val movie = movies[page]
-                    MovieCard(movie)
+            PullToRefreshBox(
+                isRefreshing = pager.isRefreshing,
+                onRefresh = { scope.launch { pager.refresh(context) } },
+                modifier = Modifier.padding(paddingValues).fillMaxSize()
+            ) {
+                when {
+                    pager.isLoadingFirstPage -> LoadingState()
+
+                    pager.movies.isEmpty() && pager.error != null -> ErrorState(
+                        message = pager.error!!,
+                        onRetry = { scope.launch { pager.retry(context) } }
+                    )
+
+                    pager.movies.isEmpty() -> EmptyState(stringResource(R.string.no_movies))
+
+                    else -> MovieCarousel(pager)
                 }
             }
+        }
+    }
+
+    @Composable
+    fun MovieCarousel(pager: MoviePager) {
+        val context = LocalContext.current
+        val pagerState = rememberPagerState(pageCount = { pager.movies.size })
+
+        // Re-evaluated whenever the user swipes or a page arrives, so the list
+        // keeps extending as long as the user keeps going.
+        LaunchedEffect(pagerState.currentPage, pager.movies.size) {
+            if (pagerState.currentPage >= pager.movies.size - PREFETCH_DISTANCE) {
+                pager.loadNext(context)
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 32.dp)
+        ) { page ->
+            MovieCard(pager.movies[page])
         }
     }
 
@@ -153,7 +178,9 @@ class MainActivity : ComponentActivity() {
                     model = Utils.imageURL + movie.poster_path,
                     contentDescription = null,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
+                    placeholder = painterResource(R.drawable.ic_no_exist),
+                    error = painterResource(R.drawable.ic_no_exist)
                 )
                 Text(
                     text = movie.title ?: "",

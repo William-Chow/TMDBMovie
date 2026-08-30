@@ -1,46 +1,59 @@
 package com.movielist.tmdb
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
-import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.ads.AdsConsentManager
+import com.movielist.tmdb.data.FavoritesStore
 import com.movielist.tmdb.network.RetrofitClient
+import com.movielist.tmdb.network.model.Cast
 import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.network.model.Video
+import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.ErrorState
+import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import kotlinx.coroutines.CancellationException
 
 class MovieActivity : ComponentActivity() {
 
     private var mInterstitialAd: InterstitialAd? = null
     private var interstitialShown = false
     private var finishAfterInterstitial = false
-    private lateinit var movieAPI: MovieApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        movieAPI = RetrofitClient.getClient().create(MovieApi::class.java)
         val movieID = intent?.getIntExtra("movie", 0) ?: 0
 
         // Survives configuration changes and process death, so a recreated
@@ -49,8 +62,10 @@ class MovieActivity : ComponentActivity() {
         finishAfterInterstitial =
             savedInstanceState?.getBoolean(STATE_FINISH_AFTER_INTERSTITIAL) == true
 
-        initAdmob()
-        if (!interstitialShown) {
+        AdsConsentManager.refresh(this)
+        // Consent was gathered by the launcher activity; without it no ad is
+        // requested at all.
+        if (!interstitialShown && AdsConsentManager.canRequestAds) {
             loadInterstitial()
         }
 
@@ -79,10 +94,6 @@ class MovieActivity : ComponentActivity() {
         if (finishAfterInterstitial && !isFinishing) {
             finish()
         }
-    }
-
-    private fun initAdmob() {
-        MobileAds.initialize(this) { }
     }
 
     private fun loadInterstitial() {
@@ -124,94 +135,253 @@ class MovieActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MovieDetailScreen(movieID: Int) {
+        val context = LocalContext.current
         var movie by remember { mutableStateOf<Movie?>(null) }
-        var isLoading by remember { mutableStateOf(true) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
+        var trailerKey by remember { mutableStateOf<String?>(null) }
+        var cast by remember { mutableStateOf<List<Cast>>(emptyList()) }
+        // Bumped by the retry button to re-run the load below.
+        var reloadToken by remember { mutableIntStateOf(0) }
 
-        LaunchedEffect(movieID) {
-            if (movieID != 0 && Utils.checkInternetConnection(this@MovieActivity)) {
-                movieAPI.getMovie(movieID, RetrofitClient.API_KEY).enqueue(object : Callback<Movie> {
-                    override fun onResponse(call: Call<Movie>, response: Response<Movie>) {
-                        movie = response.body()
-                        isLoading = false
-                    }
-                    override fun onFailure(call: Call<Movie>, t: Throwable) {
-                        isLoading = false
-                        Toast.makeText(this@MovieActivity, t.message, Toast.LENGTH_SHORT).show()
-                    }
-                })
+        val unavailable = stringResource(R.string.error_movie_unavailable)
+
+        LaunchedEffect(movieID, reloadToken) {
+            if (movieID == 0) {
+                // Nothing to load; say so rather than spinning forever.
+                errorMessage = unavailable
+                return@LaunchedEffect
+            }
+            movie = null
+            errorMessage = null
+            try {
+                movie = RetrofitClient.movieApi.getMovie(movieID, RetrofitClient.API_KEY)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (throwable: Throwable) {
+                errorMessage = Utils.errorMessage(context, throwable)
+            }
+        }
+
+        // Fetched separately: neither a missing trailer nor missing credits is
+        // a reason to fail the page.
+        LaunchedEffect(movieID, reloadToken) {
+            if (movieID == 0) return@LaunchedEffect
+            cast = try {
+                RetrofitClient.movieApi.getCredits(movieID, RetrofitClient.API_KEY)
+                    .cast.orEmpty()
+                    .sortedBy { it.order ?: Int.MAX_VALUE }
+                    .take(MAX_CAST_SHOWN)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                emptyList()
+            }
+        }
+
+        LaunchedEffect(movieID, reloadToken) {
+            if (movieID == 0) return@LaunchedEffect
+            trailerKey = try {
+                pickTrailer(RetrofitClient.movieApi.getVideo(movieID, RetrofitClient.API_KEY).results)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                null
             }
         }
 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(movie?.title ?: "Movie Detail") },
+                    title = { Text(movie?.title ?: stringResource(R.string.movie_detail)) },
                     navigationIcon = {
                         IconButton(onClick = { leaveScreen() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back)
+                            )
+                        }
+                    },
+                    actions = {
+                        movie?.let { loaded ->
+                            val isFavorite = FavoritesStore.isFavorite(loaded.id)
+                            IconButton(onClick = { FavoritesStore.toggle(loaded) }) {
+                                Icon(
+                                    imageVector = if (isFavorite) {
+                                        Icons.Default.Favorite
+                                    } else {
+                                        Icons.Default.FavoriteBorder
+                                    },
+                                    contentDescription = stringResource(
+                                        if (isFavorite) {
+                                            R.string.remove_from_favorites
+                                        } else {
+                                            R.string.add_to_favorites
+                                        }
+                                    )
+                                )
+                            }
                         }
                     }
                 )
             },
-            bottomBar = {
-                AndroidView(
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    factory = { context ->
-                        AdView(context).apply {
-                            setAdSize(AdSize.BANNER)
-                            adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
-                            loadAd(AdRequest.Builder().build())
-                        }
-                    }
-                )
-            }
+            bottomBar = { AdBanner() }
         ) { paddingValues ->
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .padding(16.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    AsyncImage(
-                        model = Utils.imageURL + movie?.poster_path,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(400.dp),
-                        contentScale = ContentScale.Fit
+            Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                val loaded = movie
+                when {
+                    errorMessage != null -> ErrorState(
+                        message = errorMessage!!,
+                        onRetry = { reloadToken++ }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    loaded == null -> LoadingState()
 
-                    Text(text = movie?.title ?: "", style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        text = "${movie?.release_date} (${movie?.release_date?.let { Utils.getYear(it) }})",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = Utils.getGenres(movie?.genres),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(text = "Overview", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        text = movie?.overview?.ifEmpty { "-" } ?: "-",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    else -> MovieDetail(loaded, trailerKey, cast)
                 }
             }
         }
     }
 
+    @Composable
+    private fun MovieDetail(movie: Movie, trailerKey: String?, cast: List<Cast>) {
+        val context = LocalContext.current
+
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            AsyncImage(
+                model = Utils.imageURL + movie.poster_path,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp),
+                contentScale = ContentScale.Fit,
+                placeholder = painterResource(R.drawable.ic_no_exist),
+                error = painterResource(R.drawable.ic_no_exist)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = movie.title ?: "", style = MaterialTheme.typography.headlineMedium)
+
+            movie.tagline?.takeIf { it.isNotBlank() }?.let { tagline ->
+                Text(
+                    text = tagline,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            movie.release_date?.takeIf { it.isNotBlank() }?.let { releaseDate ->
+                Text(
+                    text = stringResource(
+                        R.string.release_and_year,
+                        releaseDate,
+                        Utils.getYear(releaseDate)
+                    ),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Utils.formatRuntime(movie.runtime)?.let { runtime ->
+                Text(text = runtime, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            movie.vote_average?.takeIf { it > 0.0 }?.let { rating ->
+                val votes = movie.vote_count ?: 0
+                Text(
+                    text = pluralStringResource(R.plurals.rating_votes, votes, rating, votes),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Text(
+                text = Utils.getGenres(movie.genres),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            if (trailerKey != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { Utils.openUrl(context, Utils.youtubeURL + trailerKey) }) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.watch_trailer))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = stringResource(R.string.overview), style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = movie.overview?.takeIf { it.isNotBlank() } ?: stringResource(R.string.not_available),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (cast.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = stringResource(R.string.cast), style = MaterialTheme.typography.titleLarge)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(cast) { member -> CastMember(member) }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun CastMember(member: Cast) {
+        Column(
+            modifier = Modifier.width(88.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AsyncImage(
+                model = Utils.profileImageURL + member.profile_path,
+                contentDescription = null,
+                modifier = Modifier.size(72.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.ic_no_exist),
+                error = painterResource(R.drawable.ic_no_exist)
+            )
+            Text(
+                text = member.name ?: "",
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            member.character?.takeIf { it.isNotBlank() }?.let { character ->
+                Text(
+                    text = character,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+
+    /** Picks the most trailer-like YouTube clip TMDB reported, if any. */
+    private fun pickTrailer(videos: List<Video>?): String? {
+        val youtube = videos.orEmpty().filter {
+            it.site.equals("YouTube", ignoreCase = true) && !it.key.isNullOrBlank()
+        }
+        val trailers = youtube.filter { it.type.equals("Trailer", ignoreCase = true) }
+        return (trailers.firstOrNull { it.official == true }
+            ?: trailers.firstOrNull()
+            ?: youtube.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
+            ?: youtube.firstOrNull())?.key
+    }
+
     private companion object {
+        const val MAX_CAST_SHOWN = 15
         const val STATE_INTERSTITIAL_SHOWN = "interstitial_shown"
         const val STATE_FINISH_AFTER_INTERSTITIAL = "finish_after_interstitial"
     }
