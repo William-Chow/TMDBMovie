@@ -80,8 +80,10 @@ class SearchActivity : ComponentActivity() {
 
         // Keyed on the submitted term: a new term replaces the pager outright,
         // which cancels the previous request instead of racing it.
-        val pager = rememberMoviePager(submittedQuery) { page ->
-            RetrofitClient.movieApi.getSearch(RetrofitClient.API_KEY, submittedQuery, page)
+        val pager = rememberMoviePager(submittedQuery) { page, fresh ->
+            RetrofitClient.movieApi.getSearch(
+                RetrofitClient.API_KEY, submittedQuery, page, RetrofitClient.cacheControl(fresh)
+            )
         }
         // A new term is a new list, so it starts from the top with a scroll
         // state of its own. Resetting the old state with scrollToItem(0)

@@ -31,6 +31,14 @@ object RetrofitClient {
 
     private lateinit var appContext: Context
 
+    /**
+     * Cache-Control for a list request. A refresh the user asked for has to
+     * reach the network even while the cached copy is still within
+     * [ONLINE_MAX_AGE_SECONDS]; any other request sends no header and may be
+     * answered from the cache.
+     */
+    fun cacheControl(fresh: Boolean): String? = if (fresh) "no-cache" else null
+
     /** Called once from the Application, before any screen makes a request. */
     fun init(context: Context) {
         appContext = context.applicationContext

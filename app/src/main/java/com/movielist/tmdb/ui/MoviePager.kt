@@ -3,6 +3,7 @@ package com.movielist.tmdb.ui
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -17,8 +18,11 @@ import kotlinx.coroutines.CancellationException
  * Screens own a pager and call [loadNext] when the user nears the end of what
  * has already been loaded; the pager keeps track of where it is and refuses
  * overlapping or past-the-end requests, so callers can fire at it freely.
+ *
+ * [fetch] gets `fresh = true` only for a [refresh] the user asked for, which
+ * should bypass the HTTP cache; see RetrofitClient.cacheControl.
  */
-class MoviePager(private val fetch: suspend (page: Int) -> Movies) {
+class MoviePager(private val fetch: suspend (page: Int, fresh: Boolean) -> Movies) {
 
     var movies by mutableStateOf<List<Movie>>(emptyList())
         private set
@@ -29,6 +33,13 @@ class MoviePager(private val fetch: suspend (page: Int) -> Movies) {
     var endReached by mutableStateOf(false)
         private set
     var isRefreshing by mutableStateOf(false)
+        private set
+
+    /**
+     * Counts refreshes that replaced the list. Screens key their scroll state
+     * on it, so a refreshed list starts from the top again.
+     */
+    var refreshCount by mutableIntStateOf(0)
         private set
 
     private var nextPage = 1
@@ -59,13 +70,14 @@ class MoviePager(private val fetch: suspend (page: Int) -> Movies) {
         if (isRefreshing || isLoading) return
         isRefreshing = true
         try {
-            val response = fetch(1)
+            val response = fetch(1, true)
             val page = response.results.orEmpty()
             val lastPage = minOf(response.total_pages ?: 1, MAX_PAGE)
             movies = page
             endReached = page.isEmpty() || lastPage <= 1
             nextPage = 2
             error = null
+            refreshCount++
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (throwable: Throwable) {
@@ -86,7 +98,7 @@ class MoviePager(private val fetch: suspend (page: Int) -> Movies) {
     private suspend fun load(context: Context) {
         isLoading = true
         try {
-            val response = fetch(nextPage)
+            val response = fetch(nextPage, false)
             val page = response.results.orEmpty()
             // TMDB caps paging at 500 pages regardless of what total_pages says.
             val lastPage = minOf(response.total_pages ?: nextPage, MAX_PAGE)
@@ -112,5 +124,5 @@ class MoviePager(private val fetch: suspend (page: Int) -> Movies) {
  * or a new genre filter starts its own list from page 1.
  */
 @Composable
-fun rememberMoviePager(key: Any?, fetch: suspend (page: Int) -> Movies): MoviePager =
+fun rememberMoviePager(key: Any?, fetch: suspend (page: Int, fresh: Boolean) -> Movies): MoviePager =
     remember(key) { MoviePager(fetch) }

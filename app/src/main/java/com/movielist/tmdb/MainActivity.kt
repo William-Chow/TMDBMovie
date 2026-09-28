@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.*
@@ -32,6 +33,7 @@ import com.movielist.tmdb.ui.components.AdBanner
 import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
+import com.movielist.tmdb.ui.components.PullableContent
 import com.movielist.tmdb.ui.rememberMoviePager
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
@@ -74,8 +76,10 @@ class MainActivity : ComponentActivity() {
     fun MainScreen() {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        val pager = rememberMoviePager(Unit) { page ->
-            RetrofitClient.movieApi.getDiscover(RetrofitClient.API_KEY, page, null)
+        val pager = rememberMoviePager(Unit) { page, fresh ->
+            RetrofitClient.movieApi.getDiscover(
+                RetrofitClient.API_KEY, page, null, RetrofitClient.cacheControl(fresh)
+            )
         }
 
         LaunchedEffect(pager) { pager.loadNext(context) }
@@ -105,6 +109,14 @@ class MainActivity : ComponentActivity() {
                         }
                         IconButton(onClick = { Utils.intent(this@MainActivity, SearchActivity::class.java) }) {
                             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
+                        }
+                        // Pulling a sideways carousel down is easy to miss (and
+                        // not reachable for everyone), so refresh has a button too.
+                        IconButton(
+                            onClick = { scope.launch { pager.refresh(context) } },
+                            enabled = !pager.isRefreshing
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                         }
                     }
                 )
@@ -136,7 +148,9 @@ class MainActivity : ComponentActivity() {
 
                     pager.movies.isEmpty() -> EmptyState(stringResource(R.string.no_movies))
 
-                    else -> MovieCarousel(pager)
+                    // The carousel only scrolls sideways; PullableContent is
+                    // what lets a downward drag reach the PullToRefreshBox.
+                    else -> PullableContent { MovieCarousel(pager) }
                 }
             }
         }
@@ -145,22 +159,27 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun MovieCarousel(pager: MoviePager) {
         val context = LocalContext.current
-        val pagerState = rememberPagerState(pageCount = { pager.movies.size })
 
-        // Re-evaluated whenever the user swipes or a page arrives, so the list
-        // keeps extending as long as the user keeps going.
-        LaunchedEffect(pagerState.currentPage, pager.movies.size) {
-            if (pagerState.currentPage >= pager.movies.size - PREFETCH_DISTANCE) {
-                pager.loadNext(context)
+        // A refreshed list is a new list, so it starts again from its first
+        // movie instead of wherever the old one had been swiped to.
+        key(pager.refreshCount) {
+            val pagerState = rememberPagerState(pageCount = { pager.movies.size })
+
+            // Re-evaluated whenever the user swipes or a page arrives, so the
+            // list keeps extending as long as the user keeps going.
+            LaunchedEffect(pagerState.currentPage, pager.movies.size) {
+                if (pagerState.currentPage >= pager.movies.size - PREFETCH_DISTANCE) {
+                    pager.loadNext(context)
+                }
             }
-        }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 32.dp)
-        ) { page ->
-            MovieCard(pager.movies[page])
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 32.dp)
+            ) { page ->
+                MovieCard(pager.movies[page])
+            }
         }
     }
 

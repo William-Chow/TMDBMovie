@@ -7,6 +7,7 @@ import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.network.model.Movies
 import com.movielist.tmdb.network.model.Videos
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -20,7 +21,9 @@ interface MovieApi {
         @Query("api_key") api_key: String,
         @Query("page") page: Int,
         // Omitted from the query string when null, which asks for every genre.
-        @Query("with_genres") with_genres: Int?
+        @Query("with_genres") with_genres: Int?,
+        // See RetrofitClient.cacheControl; null sends no header at all.
+        @Header("Cache-Control") cacheControl: String?
     ): Movies
 
     // Get Movie Item
@@ -34,7 +37,8 @@ interface MovieApi {
     suspend fun getSearch(
         @Query("api_key") api_key: String,
         @Query("query") query: String,
-        @Query("page") page: Int
+        @Query("page") page: Int,
+        @Header("Cache-Control") cacheControl: String?
     ): Movies
 
     // Get Genre
