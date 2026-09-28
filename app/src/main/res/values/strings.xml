@@ -18,7 +18,6 @@
     <string name="watch_trailer">Watch Trailer</string>
     <string name="add_to_favorites">Add to favorites</string>
     <string name="remove_from_favorites">Remove from favorites</string>
-    <string name="filter_by_genre">Filter by genre</string>
     <string name="genre_all">All</string>
 
     <!-- Movie detail -->
