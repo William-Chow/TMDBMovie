@@ -21,6 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
@@ -159,6 +163,23 @@ fun PageLoadingRow(modifier: Modifier = Modifier) {
 @Composable
 fun AdBanner(modifier: Modifier = Modifier) {
     if (!AdsConsentManager.canRequestAds) return
+
+    val holder = remember { AdViewHolder() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // Paused with its screen, so the banner does not keep refreshing (and
+    // loading ads nobody sees) while the app is in the background.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> holder.adView?.pause()
+                Lifecycle.Event.ON_RESUME -> holder.adView?.resume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     AndroidView(
         modifier = modifier.fillMaxWidth().height(50.dp),
         factory = { context ->
@@ -166,12 +187,21 @@ fun AdBanner(modifier: Modifier = Modifier) {
                 setAdSize(AdSize.BANNER)
                 adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
                 loadAd(AdRequest.Builder().build())
+                holder.adView = this
             }
         },
         // Leaving composition (the screen closed, or consent went away) is the
         // end of this banner: stop its refreshes and free its WebView.
-        onRelease = { adView -> adView.destroy() }
+        onRelease = { adView ->
+            holder.adView = null
+            adView.destroy()
+        }
     )
+}
+
+/** Where the lifecycle observer finds the banner. Plain, not state: nothing is drawn from it. */
+private class AdViewHolder {
+    var adView: AdView? = null
 }
 
 /**

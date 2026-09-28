@@ -118,6 +118,8 @@ dependencies {
     implementation libs.androidx.lifecycle.viewmodel.ktx
     implementation libs.androidx.lifecycle.viewmodel.savedstate
     implementation libs.androidx.lifecycle.viewmodel.compose
+    // LocalLifecycleOwner, for pausing the ad banner with its screen
+    implementation libs.androidx.lifecycle.runtime.compose
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
 
