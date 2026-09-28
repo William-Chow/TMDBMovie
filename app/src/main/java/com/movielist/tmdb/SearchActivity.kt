@@ -18,12 +18,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.ui.SearchViewModel
@@ -33,6 +30,7 @@ import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PageErrorRow
 import com.movielist.tmdb.ui.components.PageLoadingRow
+import com.movielist.tmdb.ui.components.TmdbImage
 import com.movielist.tmdb.ui.components.rememberErrorMessage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
@@ -168,13 +166,10 @@ class SearchActivity : ComponentActivity() {
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = Utils.imageURL + movie.poster_path,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(R.drawable.ic_no_exist),
-                error = painterResource(R.drawable.ic_no_exist)
+            TmdbImage(
+                path = movie.poster_path,
+                size = Utils.posterSmall,
+                modifier = Modifier.size(80.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {

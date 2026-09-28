@@ -21,12 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.ui.MainViewModel
@@ -36,6 +34,7 @@ import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PullableContent
+import com.movielist.tmdb.ui.components.TmdbImage
 import com.movielist.tmdb.ui.components.rememberErrorMessage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
@@ -215,13 +214,11 @@ class MainActivity : ComponentActivity() {
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AsyncImage(
-                    model = Utils.imageURL + movie.poster_path,
-                    contentDescription = null,
+                TmdbImage(
+                    path = movie.poster_path,
+                    size = Utils.posterLarge,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
-                    contentScale = ContentScale.Fit,
-                    placeholder = painterResource(R.drawable.ic_no_exist),
-                    error = painterResource(R.drawable.ic_no_exist)
+                    contentScale = ContentScale.Fit
                 )
                 Text(
                     text = movie.title ?: "",

@@ -95,4 +95,17 @@ class UtilsTest {
         assertNull(Utils.pickTrailerKey(listOf(video("v", "Trailer", "en", site = "Vimeo"), video(null, "Trailer", "en"))))
         assertNull(Utils.pickTrailerKey(null))
     }
+
+    @Test
+    fun imageURL_joinsBaseSizeAndPath() {
+        assertEquals("https://image.tmdb.org/t/p/w342/abc.jpg", Utils.imageURL("/abc.jpg", Utils.posterMedium))
+        assertEquals("https://image.tmdb.org/t/p/w185/p.png", Utils.imageURL(" /p.png ", Utils.profileSmall))
+    }
+
+    @Test
+    fun imageURL_isNullWhenThereIsNoImage_insteadOfEndingInNull() {
+        assertNull(Utils.imageURL(null, Utils.posterLarge))
+        assertNull(Utils.imageURL("", Utils.posterLarge))
+        assertNull(Utils.imageURL("   ", Utils.posterSmall))
+    }
 }

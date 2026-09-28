@@ -23,8 +23,14 @@ import java.util.*
 class Utils {
 
     companion object {
-        const val imageURL = "https://image.tmdb.org/t/p/w500"
-        const val profileImageURL = "https://image.tmdb.org/t/p/w185"
+        private const val imageBaseURL = "https://image.tmdb.org/t/p/"
+
+        // TMDB image widths. Thumbnails use the small ones: a 500px poster
+        // for an 80dp list row only costs data and memory.
+        const val posterSmall = "w185"
+        const val posterMedium = "w342"
+        const val posterLarge = "w500"
+        const val profileSmall = "w185"
         const val youtubeURL = "https://www.youtube.com/watch?v="
         const val tmdbURL = "https://www.themoviedb.org/"
 
@@ -82,6 +88,13 @@ class Utils {
             }
             return 0
         }
+
+        /**
+         * The URL of a TMDB image [path] at [size], or null when there is no
+         * image: appending a missing path used to request ".../w500null".
+         */
+        fun imageURL(path: String?, size: String): String? =
+            path?.trim()?.takeIf { it.isNotEmpty() }?.let { imageBaseURL + size + it }
 
         /** Today in the device's time zone, in the yyyy-MM-dd form TMDB's date filters take. */
         fun today(): String = LocalDate.now().toString()

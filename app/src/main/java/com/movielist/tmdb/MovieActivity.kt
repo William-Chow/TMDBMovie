@@ -22,13 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
@@ -40,6 +38,7 @@ import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
+import com.movielist.tmdb.ui.components.TmdbImage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
 import kotlinx.coroutines.CancellationException
@@ -260,15 +259,13 @@ class MovieActivity : ComponentActivity() {
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            AsyncImage(
-                model = Utils.imageURL + movie.poster_path,
-                contentDescription = null,
+            TmdbImage(
+                path = movie.poster_path,
+                size = Utils.posterLarge,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(400.dp),
-                contentScale = ContentScale.Fit,
-                placeholder = painterResource(R.drawable.ic_no_exist),
-                error = painterResource(R.drawable.ic_no_exist)
+                contentScale = ContentScale.Fit
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -348,13 +345,10 @@ class MovieActivity : ComponentActivity() {
             modifier = Modifier.width(88.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
-                model = Utils.profileImageURL + member.profile_path,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(R.drawable.ic_no_exist),
-                error = painterResource(R.drawable.ic_no_exist)
+            TmdbImage(
+                path = member.profile_path,
+                size = Utils.profileSmall,
+                modifier = Modifier.size(72.dp).clip(CircleShape)
             )
             Text(
                 text = member.name ?: "",

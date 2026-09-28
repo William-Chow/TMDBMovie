@@ -18,14 +18,11 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.ui.GalleryViewModel
@@ -35,6 +32,7 @@ import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PageErrorRow
 import com.movielist.tmdb.ui.components.PageLoadingRow
+import com.movielist.tmdb.ui.components.TmdbImage
 import com.movielist.tmdb.ui.components.rememberErrorMessage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
@@ -201,13 +199,10 @@ class GalleryActivity : ComponentActivity() {
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column {
-                AsyncImage(
-                    model = Utils.imageURL + movie.poster_path,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.ic_no_exist),
-                    error = painterResource(R.drawable.ic_no_exist)
+                TmdbImage(
+                    path = movie.poster_path,
+                    size = Utils.posterMedium,
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
                 )
                 Text(
                     text = movie.title ?: "",
