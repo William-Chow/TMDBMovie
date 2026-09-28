@@ -10,6 +10,7 @@ import android.net.Uri
 import android.widget.Toast
 import com.movielist.tmdb.R
 import com.movielist.tmdb.network.MissingApiKeyException
+import com.movielist.tmdb.network.isUnsatisfiedCacheOnlyResponse
 import com.movielist.tmdb.network.model.Genre
 import retrofit2.HttpException
 import java.io.IOException
@@ -24,7 +25,11 @@ class Utils {
         const val profileImageURL = "https://image.tmdb.org/t/p/w185"
         const val youtubeURL = "https://www.youtube.com/watch?v="
 
-        // Check Internet Connection
+        /**
+         * Whether the device has a network that claims internet access. Only
+         * used to word an error: requests always try the network, so one that
+         * has not been validated (yet) still gets used.
+         */
         fun checkInternetConnection(context: Context): Boolean {
             val connectivityManager =
                 context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -32,8 +37,7 @@ class Utils {
             val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
             // Asking for the capability rather than the transport also covers
             // Ethernet (emulators) and VPN, which the transport list missed.
-            return activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            return activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         }
 
         /** Turns a request failure into something worth showing the user. */
@@ -49,7 +53,16 @@ class Utils {
                     R.string.no_internet_connection
                 }
             )
-            is HttpException -> context.getString(R.string.error_server, throwable.code())
+            is HttpException -> {
+                val raw = throwable.response()?.raw()
+                if (raw != null && isUnsatisfiedCacheOnlyResponse(raw)) {
+                    // OkHttp's own 504 for "cache only, and nothing cached":
+                    // no server answered, the device is offline.
+                    context.getString(R.string.no_internet_connection)
+                } else {
+                    context.getString(R.string.error_server, throwable.code())
+                }
+            }
             else -> throwable.localizedMessage ?: context.getString(R.string.error_unknown)
         }
 

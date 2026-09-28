@@ -3,15 +3,11 @@ package com.movielist.tmdb.network
 import android.content.Context
 import androidx.annotation.Keep
 import com.movielist.tmdb.BuildConfig
-import com.movielist.tmdb.util.Utils
 import okhttp3.Cache
-import okhttp3.CacheControl
-import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.jackson.JacksonConverterFactory
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 @Keep
 object RetrofitClient {
@@ -44,35 +40,6 @@ object RetrofitClient {
         appContext = context.applicationContext
     }
 
-    /**
-     * TMDB does not send cache headers of its own, so responses are given a
-     * short freshness window on the way in. Requests made with no network are
-     * then answered from that cache instead of failing outright.
-     */
-    private val cacheHeaderInterceptor = Interceptor { chain ->
-        chain.proceed(chain.request())
-            .newBuilder()
-            .header("Cache-Control", "public, max-age=$ONLINE_MAX_AGE_SECONDS")
-            .removeHeader("Pragma")
-            .build()
-    }
-
-    private val offlineCacheInterceptor = Interceptor { chain ->
-        val request = if (Utils.checkInternetConnection(appContext)) {
-            chain.request()
-        } else {
-            chain.request().newBuilder()
-                .cacheControl(
-                    CacheControl.Builder()
-                        .onlyIfCached()
-                        .maxStale(OFFLINE_MAX_STALE_DAYS, TimeUnit.DAYS)
-                        .build()
-                )
-                .build()
-        }
-        chain.proceed(request)
-    }
-
     // One Retrofit instance for the whole app; every screen shares it so the
     // underlying OkHttp connection pool, cache and thread pool are reused.
     val movieApi: MovieApi by lazy {
@@ -80,8 +47,10 @@ object RetrofitClient {
             .cache(Cache(File(appContext.cacheDir, "http"), CACHE_SIZE_BYTES))
             // First, so a build without a key never even consults the cache.
             .addInterceptor(ApiKeyInterceptor())
-            .addInterceptor(offlineCacheInterceptor)
-            .addNetworkInterceptor(cacheHeaderInterceptor)
+            // Network first; a copy up to a week old when that fails.
+            .addInterceptor(StaleCacheFallbackInterceptor(OFFLINE_MAX_STALE_DAYS))
+            // TMDB sends no cache headers, so responses get a short max-age.
+            .addNetworkInterceptor(CacheHeaderInterceptor(ONLINE_MAX_AGE_SECONDS))
             .build()
 
         Retrofit.Builder()
