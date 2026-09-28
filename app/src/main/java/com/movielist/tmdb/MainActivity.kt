@@ -113,7 +113,8 @@ class MainActivity : ComponentActivity() {
                 )
             },
             bottomBar = {
-                Column {
+                // Like AdBottomBar: Scaffold does not inset the bars it is given.
+                Column(modifier = Modifier.navigationBarsPadding()) {
                     AdBanner()
                     Button(
                         onClick = { Utils.intent(this@MainActivity, GalleryActivity::class.java) },

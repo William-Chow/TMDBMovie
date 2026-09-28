@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -168,6 +169,16 @@ fun AdBanner(modifier: Modifier = Modifier) {
             }
         }
     )
+}
+
+/**
+ * [AdBanner] as a Scaffold bottom bar. Scaffold insets its content but not
+ * the bars it is handed, and since Android 15 every app draws edge to edge,
+ * so the bar has to keep clear of the navigation bar itself.
+ */
+@Composable
+fun AdBottomBar() {
+    AdBanner(Modifier.navigationBarsPadding())
 }
 
 /**

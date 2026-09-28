@@ -38,7 +38,7 @@ import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Cast
 import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.network.model.Video
-import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
@@ -224,7 +224,7 @@ class MovieActivity : ComponentActivity() {
                     }
                 )
             },
-            bottomBar = { AdBanner() }
+            bottomBar = { AdBottomBar() }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                 val loaded = movie

@@ -23,7 +23,7 @@ import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.data.FavoriteMovie
 import com.movielist.tmdb.data.FavoritesStore
-import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
@@ -65,7 +65,7 @@ class FavoritesActivity : ComponentActivity() {
                     }
                 )
             },
-            bottomBar = { AdBanner() }
+            bottomBar = { AdBottomBar() }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                 if (favorites.isEmpty()) {
