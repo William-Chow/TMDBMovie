@@ -36,7 +36,8 @@ def tmdbApiKey = (localProperties.getProperty('tmdb.apiKey') ?:
 
 android {
     namespace 'com.movielist.tmdb'
-    compileSdk = 37
+    // 36, not 37: the API 37 platform needs AGP 9.1+, and this build uses 8.12.
+    compileSdk = 36
 
     defaultConfig {
         applicationId "com.movielist.tmdb"

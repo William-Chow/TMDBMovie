@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unit tests, lint and debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The project's daemon toolchain is JDK 17 (gradle/gradle-daemon-jvm.properties);
+      # Gradle provisions the exact vendor it asks for if this one doesn't match.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # The default package list still includes the removed "tools"
+          # package, which fails the step.
+          packages: platform-tools
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Deliberately no local.properties, key.properties or secrets: the
+      # build falls back to an empty TMDB key and an unsigned release. Don't
+      # add the real key here either; anyone who can read this public repo
+      # can download the APK artifact below.
+      - name: Test, lint and build
+        run: ./gradlew --stacktrace testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
