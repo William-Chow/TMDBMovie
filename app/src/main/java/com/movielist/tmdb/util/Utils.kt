@@ -25,6 +25,7 @@ class Utils {
         const val imageURL = "https://image.tmdb.org/t/p/w500"
         const val profileImageURL = "https://image.tmdb.org/t/p/w185"
         const val youtubeURL = "https://www.youtube.com/watch?v="
+        const val tmdbURL = "https://www.themoviedb.org/"
 
         /**
          * Whether the device has a network that claims internet access. Only

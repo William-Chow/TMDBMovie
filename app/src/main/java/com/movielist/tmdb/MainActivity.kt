@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -109,6 +110,7 @@ class MainActivity : ComponentActivity() {
                         IconButton(onClick = { pager.refresh() }, enabled = !pager.isRefreshing) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                         }
+                        OverflowMenu()
                     }
                 )
             },
@@ -145,6 +147,35 @@ class MainActivity : ComponentActivity() {
                     // what lets a downward drag reach the PullToRefreshBox.
                     else -> PullableContent { MovieCarousel(pager) }
                 }
+            }
+        }
+    }
+
+    /** About, and the ad consent choices for users who must be able to change them. */
+    @Composable
+    fun OverflowMenu() {
+        var isExpanded by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { isExpanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
+            }
+            DropdownMenu(expanded = isExpanded, onDismissRequest = { isExpanded = false }) {
+                if (AdsConsentManager.isPrivacyOptionsRequired) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.privacy_settings)) },
+                        onClick = {
+                            isExpanded = false
+                            AdsConsentManager.showPrivacyOptionsForm(this@MainActivity)
+                        }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.about)) },
+                    onClick = {
+                        isExpanded = false
+                        Utils.intent(this@MainActivity, AboutActivity::class.java)
+                    }
+                )
             }
         }
     }
