@@ -39,6 +39,7 @@
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_no_browser">No app available to open this link.</string>
     <string name="error_movie_unavailable">This movie could not be loaded.</string>
+    <string name="error_missing_api_key">This build has no TMDB API key. Add tmdb.apiKey to local.properties and rebuild the app.</string>
     <string name="press_back_again">Press back again to leave the app.</string>
 
     <!-- AdMob -->

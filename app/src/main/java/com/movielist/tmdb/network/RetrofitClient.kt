@@ -19,7 +19,10 @@ object RetrofitClient {
     // Base URL
     private const val BASE_URL = "https://api.themoviedb.org/3/"
 
-    /** Supplied through local.properties; see app/build.gradle. */
+    /**
+     * Supplied through local.properties; see app/build.gradle. Empty in a
+     * build made without one, which [ApiKeyInterceptor] reports as such.
+     */
     const val API_KEY: String = BuildConfig.TMDB_API_KEY
 
     private const val CACHE_SIZE_BYTES = 10L * 1024 * 1024
@@ -67,6 +70,8 @@ object RetrofitClient {
     val movieApi: MovieApi by lazy {
         val client = OkHttpClient.Builder()
             .cache(Cache(File(appContext.cacheDir, "http"), CACHE_SIZE_BYTES))
+            // First, so a build without a key never even consults the cache.
+            .addInterceptor(ApiKeyInterceptor())
             .addInterceptor(offlineCacheInterceptor)
             .addNetworkInterceptor(cacheHeaderInterceptor)
             .build()

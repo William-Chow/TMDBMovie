@@ -9,6 +9,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.widget.Toast
 import com.movielist.tmdb.R
+import com.movielist.tmdb.network.MissingApiKeyException
 import com.movielist.tmdb.network.model.Genre
 import retrofit2.HttpException
 import java.io.IOException
@@ -37,6 +38,8 @@ class Utils {
 
         /** Turns a request failure into something worth showing the user. */
         fun errorMessage(context: Context, throwable: Throwable): String = when (throwable) {
+            // A build without a key: say what to fix, not "please try again".
+            is MissingApiKeyException -> context.getString(R.string.error_missing_api_key)
             // A dropped request means something different depending on whether
             // the device has a network at all.
             is IOException -> context.getString(

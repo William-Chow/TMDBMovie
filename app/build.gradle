@@ -21,13 +21,18 @@ if (keystorePropertiesFile.exists() && !hasReleaseSigning) {
             "release builds will be unsigned.")
 }
 
-// The TMDB key lives in local.properties, which is not tracked. A checkout
-// without one still builds; requests then fail with a plain 401.
+// The TMDB key is not tracked. It comes from local.properties (tmdb.apiKey,
+// or TMDB_API_KEY) or from a TMDB_API_KEY environment variable, such as a CI
+// secret. Without one the app still builds (CI needs no secrets) and tells
+// the user at runtime that the key is missing.
 def localPropertiesFile = rootProject.file("local.properties")
 def localProperties = new Properties()
 if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
+    localPropertiesFile.withInputStream { localProperties.load(it) }
 }
+def tmdbApiKey = (localProperties.getProperty('tmdb.apiKey') ?:
+        localProperties.getProperty('TMDB_API_KEY') ?:
+        System.getenv('TMDB_API_KEY') ?: '').trim()
 
 android {
     namespace 'com.movielist.tmdb'
@@ -42,8 +47,7 @@ android {
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField "String", "TMDB_API_KEY",
-                "\"${localProperties.getProperty('tmdb.apiKey', '')}\""
+        buildConfigField "String", "TMDB_API_KEY", "\"${tmdbApiKey}\""
     }
     signingConfigs {
         if (hasReleaseSigning) {
@@ -83,6 +87,7 @@ dependencies {
 
     implementation libs.material
     testImplementation libs.junit
+    testImplementation libs.mockwebserver
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
