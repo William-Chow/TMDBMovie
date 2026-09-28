@@ -26,6 +26,12 @@ app/release/
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/appInsightsSettings.xml
+/.idea/other.xml
+/.idea/studiobot.xml
+/.idea/markdown.xml
+/.idea/misc.xml
 
 # OS files
 .DS_Store
