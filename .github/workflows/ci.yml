@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Unit tests, lint, debug and release builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      # The JDK gradle/gradle-daemon-jvm.properties asks for: JetBrains
+      # Runtime 17. (Given another JDK, Gradle would download that one itself.)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: jetbrains
+          java-version: '17'
+        env:
+          # The JetBrains installer looks up releases through the GitHub API.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # The default package list still includes the removed "tools"
+          # package, which fails the step.
+          packages: platform-tools
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      # Deliberately no local.properties, key.properties or secrets: the
+      # build falls back to an empty TMDB key and an unsigned release. Don't
+      # add the real key here either; anyone who can read this public repo
+      # can download the APK artifact below.
+      - name: Test, lint and build
+        run: ./gradlew --stacktrace testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+
+      # Release builds run R8 (minifyEnabled, shrinkResources), a different
+      # path from debug: a new library or a model class without keep rules
+      # breaks here first. Without key.properties the APK is left unsigned.
+      # This proves the rules build, not that the shrunk app runs: Jackson
+      # and Retrofit still need a check on a device.
+      - name: Release build (R8, unsigned)
+        run: ./gradlew --stacktrace assembleRelease
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/mapping/release/missing_rules.txt
+          if-no-files-found: ignore
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  # Runs app/src/androidTest (FavoritesStoreTest) on an emulator. Separate
+  # from the build job, which neither waits for nor depends on it.
+  instrumented:
+    name: Instrumented tests (API 34 emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: jetbrains
+          java-version: '17'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      # Lets the x86_64 emulator use hardware acceleration on the runner.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew --stacktrace connectedDebugAndroidTest
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-test-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore

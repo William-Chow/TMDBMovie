@@ -9,21 +9,39 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.widget.Toast
 import com.movielist.tmdb.R
+import com.movielist.tmdb.network.MissingApiKeyException
+import com.movielist.tmdb.network.isUnsatisfiedCacheOnlyResponse
 import com.movielist.tmdb.network.model.Genre
+import com.movielist.tmdb.network.model.Video
 import retrofit2.HttpException
 import java.io.IOException
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.*
 
 
 class Utils {
 
     companion object {
-        const val imageURL = "https://image.tmdb.org/t/p/w500"
-        const val profileImageURL = "https://image.tmdb.org/t/p/w185"
-        const val youtubeURL = "https://www.youtube.com/watch?v="
+        private const val imageBaseURL = "https://image.tmdb.org/t/p/"
 
-        // Check Internet Connection
+        // TMDB image widths. Thumbnails use the small ones: a 500px poster
+        // for an 80dp list row only costs data and memory.
+        const val posterSmall = "w185"
+        const val posterMedium = "w342"
+        const val posterLarge = "w500"
+        const val profileSmall = "w185"
+        const val youtubeURL = "https://www.youtube.com/watch?v="
+        const val tmdbURL = "https://www.themoviedb.org/"
+
+        /** Intent extra carrying the id of the movie MovieActivity shows. */
+        const val movieExtra = "movie"
+
+        /**
+         * Whether the device has a network that claims internet access. Only
+         * used to word an error: requests always try the network, so one that
+         * has not been validated (yet) still gets used.
+         */
         fun checkInternetConnection(context: Context): Boolean {
             val connectivityManager =
                 context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -31,12 +49,13 @@ class Utils {
             val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
             // Asking for the capability rather than the transport also covers
             // Ethernet (emulators) and VPN, which the transport list missed.
-            return activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            return activeNetwork.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         }
 
         /** Turns a request failure into something worth showing the user. */
         fun errorMessage(context: Context, throwable: Throwable): String = when (throwable) {
+            // A build without a key: say what to fix, not "please try again".
+            is MissingApiKeyException -> context.getString(R.string.error_missing_api_key)
             // A dropped request means something different depending on whether
             // the device has a network at all.
             is IOException -> context.getString(
@@ -46,7 +65,16 @@ class Utils {
                     R.string.no_internet_connection
                 }
             )
-            is HttpException -> context.getString(R.string.error_server, throwable.code())
+            is HttpException -> {
+                val raw = throwable.response()?.raw()
+                if (raw != null && isUnsatisfiedCacheOnlyResponse(raw)) {
+                    // OkHttp's own 504 for "cache only, and nothing cached":
+                    // no server answered, the device is offline.
+                    context.getString(R.string.no_internet_connection)
+                } else {
+                    context.getString(R.string.error_server, throwable.code())
+                }
+            }
             else -> throwable.localizedMessage ?: context.getString(R.string.error_unknown)
         }
 
@@ -64,6 +92,52 @@ class Utils {
             return 0
         }
 
+        /**
+         * The URL of a TMDB image [path] at [size], or null when there is no
+         * image: appending a missing path used to request ".../w500null".
+         */
+        fun imageURL(path: String?, size: String): String? =
+            path?.trim()?.takeIf { it.isNotEmpty() }?.let { imageBaseURL + size + it }
+
+        /** Today in the device's time zone, in the yyyy-MM-dd form TMDB's date filters take. */
+        fun today(): String = LocalDate.now().toString()
+
+        /**
+         * Languages to ask TMDB for trailers in: English, clips with no
+         * language set ("null", how many trailers are filed) and the film's
+         * [originalLanguage], without which many non-English films have none.
+         */
+        fun videoLanguages(originalLanguage: String?): String {
+            val original = originalLanguage?.trim()?.lowercase()
+            return if (original.isNullOrEmpty() || original == "en" || original == "null") {
+                "en,null"
+            } else {
+                "en,null,$original"
+            }
+        }
+
+        /**
+         * Picks the most trailer-like YouTube clip TMDB reported, if any: an
+         * official trailer before any trailer, then a teaser, then any clip.
+         * Among equals English comes first, then untagged clips, then others.
+         */
+        fun pickTrailerKey(videos: List<Video>?): String? {
+            val youtube = videos.orEmpty()
+                .filter { it.site.equals("YouTube", ignoreCase = true) && !it.key.isNullOrBlank() }
+                .sortedBy {
+                    when (it.iso_639_1?.lowercase()) {
+                        "en" -> 0
+                        null, "", "xx" -> 1
+                        else -> 2
+                    }
+                }
+            val trailers = youtube.filter { it.type.equals("Trailer", ignoreCase = true) }
+            return (trailers.firstOrNull { it.official == true }
+                ?: trailers.firstOrNull()
+                ?: youtube.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
+                ?: youtube.firstOrNull())?.key
+        }
+
         fun getGenres(genres: List<Genre>?): String =
             genres.orEmpty().mapNotNull { it.name }.joinToString(", ")
 
@@ -77,7 +151,7 @@ class Utils {
 
         fun intent(context: Context, movieID: Int?, className: Class<*>?) {
             val intent = Intent(context, className)
-            intent.putExtra("movie", movieID)
+            intent.putExtra(movieExtra, movieID)
             context.startActivity(intent)
         }
 

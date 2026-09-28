@@ -7,20 +7,27 @@ import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.network.model.Movies
 import com.movielist.tmdb.network.model.Videos
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Path
 import retrofit2.http.Query
 
 @Keep
 interface MovieApi {
 
-    // Get Movie List
-    // discover/movie?api_key={api_key}&page=1&with_genres=28
-    @GET("discover/movie?sort_by=release_date.desc&include_adult=false&include_video=true")
+    // Get Movie List: the latest releases, newest first
+    // discover/movie?api_key={api_key}&page=1&with_genres=28&release_date.lte=2025-01-31
+    // vote_count.gte=10 drops stub entries that hardly anyone has rated.
+    @GET("discover/movie?sort_by=release_date.desc&include_adult=false&include_video=true&vote_count.gte=10")
     suspend fun getDiscover(
         @Query("api_key") api_key: String,
         @Query("page") page: Int,
         // Omitted from the query string when null, which asks for every genre.
-        @Query("with_genres") with_genres: Int?
+        @Query("with_genres") with_genres: Int?,
+        // yyyy-MM-dd, normally today: newest-first would otherwise open with
+        // films that have not been released yet.
+        @Query("release_date.lte") releasedOnOrBefore: String,
+        // See RetrofitClient.cacheControl; null sends no header at all.
+        @Header("Cache-Control") cacheControl: String?
     ): Movies
 
     // Get Movie Item
@@ -34,7 +41,8 @@ interface MovieApi {
     suspend fun getSearch(
         @Query("api_key") api_key: String,
         @Query("query") query: String,
-        @Query("page") page: Int
+        @Query("page") page: Int,
+        @Header("Cache-Control") cacheControl: String?
     ): Movies
 
     // Get Genre
@@ -48,7 +56,12 @@ interface MovieApi {
     suspend fun getCredits(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Credits
 
     // Get Video Key
-    // movie/76600/videos?api_key={api_key}&language=en-US
+    // movie/76600/videos?api_key={api_key}&language=en-US&include_video_language=en,null,ko
     @GET("movie/{movie_id}/videos?language=en-US")
-    suspend fun getVideo(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Videos
+    suspend fun getVideo(
+        @Path("movie_id") movie_id: Int,
+        @Query("api_key") api_key: String,
+        // Without it only en-US clips come back; see Utils.videoLanguages.
+        @Query("include_video_language") include_video_language: String
+    ): Videos
 }

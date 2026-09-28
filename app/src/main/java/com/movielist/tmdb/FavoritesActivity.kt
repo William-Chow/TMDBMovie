@@ -13,18 +13,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
 import com.movielist.tmdb.data.FavoriteMovie
 import com.movielist.tmdb.data.FavoritesStore
-import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.EmptyState
+import com.movielist.tmdb.ui.components.TmdbImage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
 
@@ -65,7 +63,7 @@ class FavoritesActivity : ComponentActivity() {
                     }
                 )
             },
-            bottomBar = { AdBanner() }
+            bottomBar = { AdBottomBar() }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                 if (favorites.isEmpty()) {
@@ -95,13 +93,10 @@ class FavoritesActivity : ComponentActivity() {
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column {
-                AsyncImage(
-                    model = Utils.imageURL + movie.poster_path,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                    contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.ic_no_exist),
-                    error = painterResource(R.drawable.ic_no_exist)
+                TmdbImage(
+                    path = movie.poster_path,
+                    size = Utils.posterMedium,
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
                 )
                 Text(
                     text = movie.title ?: "",

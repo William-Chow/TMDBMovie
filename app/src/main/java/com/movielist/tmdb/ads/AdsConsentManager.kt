@@ -2,6 +2,7 @@ package com.movielist.tmdb.ads
 
 import android.app.Activity
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,6 +10,7 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
+import com.movielist.tmdb.R
 
 /**
  * Owns the GDPR/UMP consent handshake and the one-time Mobile Ads start-up.
@@ -22,6 +24,14 @@ object AdsConsentManager {
 
     /** Observable so ad slots appear as soon as consent allows them. */
     var canRequestAds by mutableStateOf(false)
+        private set
+
+    /**
+     * Whether this user has to be offered a way to review or withdraw their
+     * consent (UMP says so for regions like the EEA and the UK). Observable,
+     * because it is only known once the consent info update has come back.
+     */
+    var isPrivacyOptionsRequired by mutableStateOf(false)
         private set
 
     /**
@@ -59,9 +69,27 @@ object AdsConsentManager {
         syncCanRequestAds(context, UserMessagingPlatform.getConsentInformation(context))
     }
 
+    /**
+     * Opens UMP's privacy options form, where the user can review, change or
+     * withdraw the consent they gave. Offered wherever
+     * [isPrivacyOptionsRequired] is true.
+     */
+    fun showPrivacyOptionsForm(activity: Activity) {
+        UserMessagingPlatform.showPrivacyOptionsForm(activity) { formError ->
+            if (formError != null) {
+                Toast.makeText(activity, R.string.privacy_settings_unavailable, Toast.LENGTH_SHORT).show()
+            }
+            // A changed choice can change whether ads may be requested at all.
+            syncCanRequestAds(activity, UserMessagingPlatform.getConsentInformation(activity))
+        }
+    }
+
     private fun syncCanRequestAds(context: Context, consentInformation: ConsentInformation) {
-        if (!consentInformation.canRequestAds()) return
-        canRequestAds = true
+        isPrivacyOptionsRequired = consentInformation.privacyOptionsRequirementStatus ==
+            ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
+        // Follows the SDK both ways, so ads stop if consent has to be asked again.
+        canRequestAds = consentInformation.canRequestAds()
+        if (!canRequestAds) return
         if (!mobileAdsInitialized) {
             mobileAdsInitialized = true
             MobileAds.initialize(context.applicationContext) { }

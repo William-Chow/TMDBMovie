@@ -6,16 +6,18 @@
     <string name="gallery_view">GALLERY VIEW</string>
     <string name="movie_detail">Movie Detail</string>
     <string name="favorites">Favorites</string>
+    <string name="about">About</string>
 
     <!-- Actions -->
     <string name="search">Search</string>
     <string name="back">Back</string>
     <string name="clear">Clear</string>
     <string name="retry">Retry</string>
+    <string name="refresh">Refresh</string>
+    <string name="more_options">More options</string>
     <string name="watch_trailer">Watch Trailer</string>
     <string name="add_to_favorites">Add to favorites</string>
     <string name="remove_from_favorites">Remove from favorites</string>
-    <string name="filter_by_genre">Filter by genre</string>
     <string name="genre_all">All</string>
 
     <!-- Movie detail -->
@@ -23,6 +25,17 @@
     <string name="cast">Cast</string>
     <string name="release_and_year">%1$s (%2$d)</string>
     <string name="not_available">-</string>
+
+    <!-- About -->
+    <string name="about_version">Version %1$s</string>
+    <string name="about_data_title">Movie data</string>
+    <!-- Attribution wording required by the TMDB API terms of use. -->
+    <string name="tmdb_attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="tmdb_website">Visit themoviedb.org</string>
+    <string name="privacy_settings">Privacy settings</string>
+    <string name="privacy_settings_summary">Review or change the choices you made about how ads may use your data.</string>
+    <string name="privacy_settings_open">Open privacy settings</string>
+    <string name="privacy_settings_unavailable">Privacy settings could not be opened. Please try again later.</string>
 
     <!-- Search -->
     <string name="search_hint">Search movies…</string>
@@ -33,18 +46,16 @@
     <string name="no_movies">No movies to show right now</string>
     <string name="no_favorites">No saved movies yet. Tap the heart on a movie to save it.</string>
     <string name="no_movies_in_genre">No movies found in %1$s</string>
-    <string name="no_internet_connection">No Internet Connection. Please Try Again.</string>
+    <string name="no_internet_connection">No internet connection. Check your connection and try again.</string>
     <string name="error_unreachable">Couldn\'t reach the server. Please try again.</string>
     <string name="error_server">The server returned an error (%1$d). Please try again.</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_no_browser">No app available to open this link.</string>
     <string name="error_movie_unavailable">This movie could not be loaded.</string>
+    <string name="error_missing_api_key">This build has no TMDB API key. Add tmdb.apiKey to local.properties and rebuild the app.</string>
     <string name="press_back_again">Press back again to leave the app.</string>
 
-    <!-- AdMob -->
-    <string name="admob_id">ca-app-pub-4541063798492496~7778027755</string>
-    <string name="admob_banner_ad_unit_id">ca-app-pub-4541063798492496/9305326872</string>
-    <string name="admob_interstitial_ad_unit_id">ca-app-pub-4541063798492496/3290582868</string>
+    <!-- AdMob IDs are set per build type in app/build.gradle (test units in debug). -->
     <plurals name="rating_votes">
         <item quantity="one">%1$.1f / 10 (%2$d vote)</item>
         <item quantity="other">%1$.1f / 10 (%2$d votes)</item>

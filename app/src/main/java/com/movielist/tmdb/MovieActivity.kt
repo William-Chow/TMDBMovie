@@ -1,6 +1,7 @@
 package com.movielist.tmdb
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
@@ -22,28 +23,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.movielist.tmdb.ads.AdsConsentManager
+import com.movielist.tmdb.ads.InterstitialPacer
 import com.movielist.tmdb.data.FavoritesStore
-import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Cast
 import com.movielist.tmdb.network.model.Movie
-import com.movielist.tmdb.network.model.Video
-import com.movielist.tmdb.ui.components.AdBanner
+import com.movielist.tmdb.ui.MovieViewModel
+import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
+import com.movielist.tmdb.ui.components.TmdbImage
+import com.movielist.tmdb.ui.components.rememberErrorMessage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
-import kotlinx.coroutines.CancellationException
 
 class MovieActivity : ComponentActivity() {
 
@@ -54,18 +55,23 @@ class MovieActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val movieID = intent?.getIntExtra("movie", 0) ?: 0
-
         // Survives configuration changes and process death, so a recreated
         // activity never shows a second interstitial for the same visit.
         interstitialShown = savedInstanceState?.getBoolean(STATE_INTERSTITIAL_SHOWN) == true
         finishAfterInterstitial =
             savedInstanceState?.getBoolean(STATE_FINISH_AFTER_INTERSTITIAL) == true
 
+        if (savedInstanceState == null) {
+            // One visit per screen opened, not per rotation.
+            InterstitialPacer.shared.onDetailVisited()
+        }
+
         AdsConsentManager.refresh(this)
         // Consent was gathered by the launcher activity; without it no ad is
-        // requested at all.
-        if (!interstitialShown && AdsConsentManager.canRequestAds) {
+        // requested at all. Nor is one loaded that pacing would not let show.
+        if (!interstitialShown && AdsConsentManager.canRequestAds &&
+            InterstitialPacer.shared.isAdDue(SystemClock.elapsedRealtime())
+        ) {
             loadInterstitial()
         }
 
@@ -75,7 +81,7 @@ class MovieActivity : ComponentActivity() {
 
         setContent {
             TMDBMovieTheme {
-                MovieDetailScreen(movieID)
+                MovieDetailScreen()
             }
         }
     }
@@ -112,12 +118,14 @@ class MovieActivity : ComponentActivity() {
 
     /**
      * Exits the screen, showing the interstitial on the way out if one is
-     * ready. Leaving is a deliberate transition, so the ad never interrupts
-     * the user mid-read.
+     * ready and [InterstitialPacer] allows it. Leaving is a deliberate
+     * transition, so the ad never interrupts the user mid-read.
      */
     private fun leaveScreen() {
         val ad = mInterstitialAd
-        if (interstitialShown || ad == null) {
+        if (interstitialShown || ad == null ||
+            !InterstitialPacer.shared.isAdDue(SystemClock.elapsedRealtime())
+        ) {
             // Never hold the user on the screen waiting for an ad to load.
             finish()
             return
@@ -126,6 +134,8 @@ class MovieActivity : ComponentActivity() {
         finishAfterInterstitial = true
         mInterstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() =
+                InterstitialPacer.shared.onAdShown(SystemClock.elapsedRealtime())
             override fun onAdDismissedFullScreenContent() = finish()
             override fun onAdFailedToShowFullScreenContent(adError: AdError) = finish()
         }
@@ -134,60 +144,11 @@ class MovieActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun MovieDetailScreen(movieID: Int) {
-        val context = LocalContext.current
-        var movie by remember { mutableStateOf<Movie?>(null) }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
-        var trailerKey by remember { mutableStateOf<String?>(null) }
-        var cast by remember { mutableStateOf<List<Cast>>(emptyList()) }
-        // Bumped by the retry button to re-run the load below.
-        var reloadToken by remember { mutableIntStateOf(0) }
-
-        val unavailable = stringResource(R.string.error_movie_unavailable)
-
-        LaunchedEffect(movieID, reloadToken) {
-            if (movieID == 0) {
-                // Nothing to load; say so rather than spinning forever.
-                errorMessage = unavailable
-                return@LaunchedEffect
-            }
-            movie = null
-            errorMessage = null
-            try {
-                movie = RetrofitClient.movieApi.getMovie(movieID, RetrofitClient.API_KEY)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (throwable: Throwable) {
-                errorMessage = Utils.errorMessage(context, throwable)
-            }
-        }
-
-        // Fetched separately: neither a missing trailer nor missing credits is
-        // a reason to fail the page.
-        LaunchedEffect(movieID, reloadToken) {
-            if (movieID == 0) return@LaunchedEffect
-            cast = try {
-                RetrofitClient.movieApi.getCredits(movieID, RetrofitClient.API_KEY)
-                    .cast.orEmpty()
-                    .sortedBy { it.order ?: Int.MAX_VALUE }
-                    .take(MAX_CAST_SHOWN)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                emptyList()
-            }
-        }
-
-        LaunchedEffect(movieID, reloadToken) {
-            if (movieID == 0) return@LaunchedEffect
-            trailerKey = try {
-                pickTrailer(RetrofitClient.movieApi.getVideo(movieID, RetrofitClient.API_KEY).results)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                null
-            }
-        }
+    fun MovieDetailScreen(viewModel: MovieViewModel = viewModel()) {
+        // Owned by the ViewModel, so a rotation keeps the loaded movie, and
+        // the movie id (an intent extra) brings it back after process death.
+        val movie = viewModel.movie
+        val error = viewModel.error
 
         Scaffold(
             topBar = {
@@ -224,19 +185,24 @@ class MovieActivity : ComponentActivity() {
                     }
                 )
             },
-            bottomBar = { AdBanner() }
+            bottomBar = { AdBottomBar() }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                val loaded = movie
                 when {
-                    errorMessage != null -> ErrorState(
-                        message = errorMessage!!,
-                        onRetry = { reloadToken++ }
+                    // Nothing to load; say so rather than spinning forever.
+                    viewModel.isUnavailable -> ErrorState(
+                        message = stringResource(R.string.error_movie_unavailable),
+                        onRetry = { viewModel.retry() }
                     )
 
-                    loaded == null -> LoadingState()
+                    error != null -> ErrorState(
+                        message = rememberErrorMessage(error),
+                        onRetry = { viewModel.retry() }
+                    )
 
-                    else -> MovieDetail(loaded, trailerKey, cast)
+                    movie == null -> LoadingState()
+
+                    else -> MovieDetail(movie, viewModel.trailerKey, viewModel.cast)
                 }
             }
         }
@@ -251,15 +217,13 @@ class MovieActivity : ComponentActivity() {
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            AsyncImage(
-                model = Utils.imageURL + movie.poster_path,
-                contentDescription = null,
+            TmdbImage(
+                path = movie.poster_path,
+                size = Utils.posterLarge,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(400.dp),
-                contentScale = ContentScale.Fit,
-                placeholder = painterResource(R.drawable.ic_no_exist),
-                error = painterResource(R.drawable.ic_no_exist)
+                contentScale = ContentScale.Fit
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -339,13 +303,10 @@ class MovieActivity : ComponentActivity() {
             modifier = Modifier.width(88.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
-                model = Utils.profileImageURL + member.profile_path,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(R.drawable.ic_no_exist),
-                error = painterResource(R.drawable.ic_no_exist)
+            TmdbImage(
+                path = member.profile_path,
+                size = Utils.profileSmall,
+                modifier = Modifier.size(72.dp).clip(CircleShape)
             )
             Text(
                 text = member.name ?: "",
@@ -368,20 +329,7 @@ class MovieActivity : ComponentActivity() {
         }
     }
 
-    /** Picks the most trailer-like YouTube clip TMDB reported, if any. */
-    private fun pickTrailer(videos: List<Video>?): String? {
-        val youtube = videos.orEmpty().filter {
-            it.site.equals("YouTube", ignoreCase = true) && !it.key.isNullOrBlank()
-        }
-        val trailers = youtube.filter { it.type.equals("Trailer", ignoreCase = true) }
-        return (trailers.firstOrNull { it.official == true }
-            ?: trailers.firstOrNull()
-            ?: youtube.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
-            ?: youtube.firstOrNull())?.key
-    }
-
     private companion object {
-        const val MAX_CAST_SHOWN = 15
         const val STATE_INTERSTITIAL_SHOWN = "interstitial_shown"
         const val STATE_FINISH_AFTER_INTERSTITIAL = "finish_after_interstitial"
     }

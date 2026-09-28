@@ -3,34 +3,104 @@ package com.movielist.tmdb.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.movielist.tmdb.R
 import com.movielist.tmdb.ads.AdsConsentManager
+import com.movielist.tmdb.util.Utils
+
+/**
+ * A centred column at least as tall as the space it is given, inside a
+ * vertical scroll. PullToRefreshBox only reacts to nested scrolling, so
+ * without the scroll a loading, empty or error state could not be pulled;
+ * content taller than the screen (landscape, large fonts) simply scrolls.
+ */
+@Composable
+private fun ScrollableCenteredColumn(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val minHeight = if (constraints.hasBoundedHeight) maxHeight else 0.dp
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = minHeight)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            content = content
+        )
+    }
+}
+
+/**
+ * Lays [content] out in exactly the space this is given, inside a vertical
+ * scroll that has nothing to scroll. Content that only scrolls sideways, like
+ * the home carousel, never produces the vertical nested scrolling a
+ * PullToRefreshBox listens for; this scroll turns a downward drag into it.
+ */
+@Composable
+fun PullableContent(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val viewport = if (constraints.hasBoundedHeight) Modifier.height(maxHeight) else Modifier
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .then(viewport),
+            content = content
+        )
+    }
+}
+
+/**
+ * The message to show for a failed request. Worked out once per failure,
+ * while its connectivity check still describes the moment it failed.
+ */
+@Composable
+fun rememberErrorMessage(error: Throwable): String {
+    val context = LocalContext.current
+    return remember(error) { Utils.errorMessage(context, error) }
+}
 
 /** Full-screen spinner, for the first load of a screen. */
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    ScrollableCenteredColumn(modifier) {
         CircularProgressIndicator()
     }
 }
@@ -41,11 +111,7 @@ fun LoadingState(modifier: Modifier = Modifier) {
  */
 @Composable
 fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    ScrollableCenteredColumn(modifier) {
         Image(
             painter = painterResource(R.drawable.ic_no_exist),
             contentDescription = null,
@@ -64,11 +130,7 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
 /** Shown when a request succeeded but there is nothing to list. */
 @Composable
 fun EmptyState(message: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    ScrollableCenteredColumn(modifier) {
         Image(
             painter = painterResource(R.drawable.ic_empty_result),
             contentDescription = null,
@@ -101,6 +163,23 @@ fun PageLoadingRow(modifier: Modifier = Modifier) {
 @Composable
 fun AdBanner(modifier: Modifier = Modifier) {
     if (!AdsConsentManager.canRequestAds) return
+
+    val holder = remember { AdViewHolder() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // Paused with its screen, so the banner does not keep refreshing (and
+    // loading ads nobody sees) while the app is in the background.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> holder.adView?.pause()
+                Lifecycle.Event.ON_RESUME -> holder.adView?.resume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     AndroidView(
         modifier = modifier.fillMaxWidth().height(50.dp),
         factory = { context ->
@@ -108,9 +187,31 @@ fun AdBanner(modifier: Modifier = Modifier) {
                 setAdSize(AdSize.BANNER)
                 adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
                 loadAd(AdRequest.Builder().build())
+                holder.adView = this
             }
+        },
+        // Leaving composition (the screen closed, or consent went away) is the
+        // end of this banner: stop its refreshes and free its WebView.
+        onRelease = { adView ->
+            holder.adView = null
+            adView.destroy()
         }
     )
+}
+
+/** Where the lifecycle observer finds the banner. Plain, not state: nothing is drawn from it. */
+private class AdViewHolder {
+    var adView: AdView? = null
+}
+
+/**
+ * [AdBanner] as a Scaffold bottom bar. Scaffold insets its content but not
+ * the bars it is handed, and since Android 15 every app draws edge to edge,
+ * so the bar has to keep clear of the navigation bar itself.
+ */
+@Composable
+fun AdBottomBar() {
+    AdBanner(Modifier.navigationBarsPadding())
 }
 
 /**

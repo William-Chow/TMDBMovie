@@ -4,47 +4,56 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// Release signing is optional. key.properties is never committed (copy
+// key.properties.example); without it, or when the keystore it names does not
+// exist, release builds come out unsigned, so CI and fresh clones need no
+// secrets.
 def keystorePropertiesFile = rootProject.file("key.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def releaseStoreFile = keystoreProperties['storeFile'] ?
+        rootProject.file(keystoreProperties['storeFile']) : null
+def hasReleaseSigning = releaseStoreFile != null && releaseStoreFile.exists()
+if (keystorePropertiesFile.exists() && !hasReleaseSigning) {
+    logger.warn("key.properties does not point at an existing storeFile; " +
+            "release builds will be unsigned.")
 }
 
-// The TMDB key lives in local.properties, which is not tracked. A checkout
-// without one still builds; requests then fail with a plain 401.
+// The TMDB key is not tracked. It comes from local.properties (tmdb.apiKey,
+// or TMDB_API_KEY) or from a TMDB_API_KEY environment variable, such as a CI
+// secret. Without one the app still builds (CI needs no secrets) and tells
+// the user at runtime that the key is missing.
 def localPropertiesFile = rootProject.file("local.properties")
 def localProperties = new Properties()
 if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
+    localPropertiesFile.withInputStream { localProperties.load(it) }
 }
+def tmdbApiKey = (localProperties.getProperty('tmdb.apiKey') ?:
+        localProperties.getProperty('TMDB_API_KEY') ?:
+        System.getenv('TMDB_API_KEY') ?: '').trim()
 
 android {
     namespace 'com.movielist.tmdb'
-    compileSdk = 37
+    // 36, not 37: the API 37 platform needs AGP 9.1+, and this build uses 8.12.
+    compileSdk = 36
 
     defaultConfig {
         applicationId "com.movielist.tmdb"
         minSdk 28
         targetSdk 36
-        versionCode 3
-        versionName "3.0"
+        versionCode 4
+        versionName "3.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField "String", "TMDB_API_KEY",
-                "\"${localProperties.getProperty('tmdb.apiKey', '')}\""
+        buildConfigField "String", "TMDB_API_KEY", "\"${tmdbApiKey}\""
     }
-
-    /*
-    storeFile=app/keystore/keystore.jks
-    storePassword=android
-    keyAlias=android
-    keyPassword=android
-     */
     signingConfigs {
-        release {
-            if (keystorePropertiesFile.exists()) {
-                storeFile = rootProject.file(keystoreProperties['storeFile'])
+        if (hasReleaseSigning) {
+            release {
+                storeFile = releaseStoreFile
                 storePassword = keystoreProperties['storePassword']
                 keyAlias = keystoreProperties['keyAlias']
                 keyPassword = keystoreProperties['keyPassword']
@@ -53,8 +62,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Google's sample AdMob app and ad units: they always fill, and
+            // clicks while developing never count against the real account.
+            resValue "string", "admob_id", "ca-app-pub-3940256099942544~3347511713"
+            resValue "string", "admob_banner_ad_unit_id", "ca-app-pub-3940256099942544/6300978111"
+            resValue "string", "admob_interstitial_ad_unit_id", "ca-app-pub-3940256099942544/1033173712"
+        }
         release {
-            signingConfig signingConfigs.release
+            resValue "string", "admob_id", "ca-app-pub-4541063798492496~7778027755"
+            resValue "string", "admob_banner_ad_unit_id", "ca-app-pub-4541063798492496/9305326872"
+            resValue "string", "admob_interstitial_ad_unit_id", "ca-app-pub-4541063798492496/3290582868"
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -77,6 +98,8 @@ dependencies {
 
     implementation libs.material
     testImplementation libs.junit
+    testImplementation libs.mockwebserver
+    testImplementation libs.kotlinx.coroutines.test
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
@@ -90,6 +113,13 @@ dependencies {
     implementation libs.androidx.material3
     implementation libs.androidx.activity.compose
     implementation libs.coil.compose
+
+    // ViewModels: screen state that survives rotation and process death
+    implementation libs.androidx.lifecycle.viewmodel.ktx
+    implementation libs.androidx.lifecycle.viewmodel.savedstate
+    implementation libs.androidx.lifecycle.viewmodel.compose
+    // LocalLifecycleOwner, for pausing the ad banner with its screen
+    implementation libs.androidx.lifecycle.runtime.compose
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
 
