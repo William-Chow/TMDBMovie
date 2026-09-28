@@ -4,7 +4,9 @@ import com.movielist.tmdb.network.model.Genre
 import com.movielist.tmdb.util.Utils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class UtilsTest {
 
@@ -25,6 +27,13 @@ class UtilsTest {
     fun getYear_readsTheYearFromAReleaseDate() {
         assertEquals(1999, Utils.getYear("1999-03-31"))
         assertEquals(0, Utils.getYear(""))
+    }
+
+    @Test
+    fun today_isAnIsoDateAsTmdbExpects() {
+        val today = Utils.today()
+        assertTrue(today, Regex("\\d{4}-\\d{2}-\\d{2}").matches(today))
+        assertEquals(LocalDate.now().toString(), today)
     }
 
     @Test

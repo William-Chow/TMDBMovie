@@ -14,14 +14,18 @@ import retrofit2.http.Query
 @Keep
 interface MovieApi {
 
-    // Get Movie List
-    // discover/movie?api_key={api_key}&page=1&with_genres=28
-    @GET("discover/movie?sort_by=release_date.desc&include_adult=false&include_video=true")
+    // Get Movie List: the latest releases, newest first
+    // discover/movie?api_key={api_key}&page=1&with_genres=28&release_date.lte=2025-01-31
+    // vote_count.gte=10 drops stub entries that hardly anyone has rated.
+    @GET("discover/movie?sort_by=release_date.desc&include_adult=false&include_video=true&vote_count.gte=10")
     suspend fun getDiscover(
         @Query("api_key") api_key: String,
         @Query("page") page: Int,
         // Omitted from the query string when null, which asks for every genre.
         @Query("with_genres") with_genres: Int?,
+        // yyyy-MM-dd, normally today: newest-first would otherwise open with
+        // films that have not been released yet.
+        @Query("release_date.lte") releasedOnOrBefore: String,
         // See RetrofitClient.cacheControl; null sends no header at all.
         @Header("Cache-Control") cacheControl: String?
     ): Movies

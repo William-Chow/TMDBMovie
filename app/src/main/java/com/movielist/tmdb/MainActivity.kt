@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         val pager = rememberMoviePager(Unit) { page, fresh ->
             RetrofitClient.movieApi.getDiscover(
-                RetrofitClient.API_KEY, page, null, RetrofitClient.cacheControl(fresh)
+                RetrofitClient.API_KEY, page, null, Utils.today(), RetrofitClient.cacheControl(fresh)
             )
         }
 

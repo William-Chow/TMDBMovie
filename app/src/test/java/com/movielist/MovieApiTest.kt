@@ -43,8 +43,8 @@ class MovieApiTest {
         enqueuePage()
         enqueuePage()
 
-        api.getDiscover("key", 2, null, RetrofitClient.cacheControl(fresh = false))
-        api.getDiscover("key", 1, 28, RetrofitClient.cacheControl(fresh = true))
+        api.getDiscover("key", 2, null, "2025-01-31", RetrofitClient.cacheControl(fresh = false))
+        api.getDiscover("key", 1, 28, "2025-01-31", RetrofitClient.cacheControl(fresh = true))
 
         val normal = server.takeRequest()
         assertEquals("/3/discover/movie", normal.requestUrl!!.encodedPath)
@@ -56,6 +56,18 @@ class MovieApiTest {
         val refresh = server.takeRequest()
         assertEquals("28", refresh.requestUrl!!.queryParameter("with_genres"))
         assertEquals("no-cache", refresh.getHeader("Cache-Control"))
+    }
+
+    @Test
+    fun discover_onlyAsksForMoviesAlreadyReleased(): Unit = runBlocking {
+        enqueuePage()
+
+        api.getDiscover("key", 1, null, "2025-01-31", null)
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("release_date.desc", url.queryParameter("sort_by"))
+        assertEquals("2025-01-31", url.queryParameter("release_date.lte"))
+        assertEquals("10", url.queryParameter("vote_count.gte"))
     }
 
     @Test
@@ -80,7 +92,7 @@ class MovieApiTest {
             """.trimIndent()
         )
 
-        val page = api.getDiscover("key", 1, null, null)
+        val page = api.getDiscover("key", 1, null, "2025-01-31", null)
 
         assertEquals(3, page.total_pages)
         val movie = page.results!!.single()

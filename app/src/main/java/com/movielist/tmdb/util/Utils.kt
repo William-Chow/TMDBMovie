@@ -15,6 +15,7 @@ import com.movielist.tmdb.network.model.Genre
 import retrofit2.HttpException
 import java.io.IOException
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.*
 
 
@@ -79,6 +80,9 @@ class Utils {
             }
             return 0
         }
+
+        /** Today in the device's time zone, in the yyyy-MM-dd form TMDB's date filters take. */
+        fun today(): String = LocalDate.now().toString()
 
         fun getGenres(genres: List<Genre>?): String =
             genres.orEmpty().mapNotNull { it.name }.joinToString(", ")

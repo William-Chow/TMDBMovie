@@ -84,7 +84,11 @@ class GalleryActivity : ComponentActivity() {
         // still fills the grid instead of returning whatever the first page held.
         val pager = rememberMoviePager(selectedGenre?.id) { page, fresh ->
             RetrofitClient.movieApi.getDiscover(
-                RetrofitClient.API_KEY, page, selectedGenre?.id, RetrofitClient.cacheControl(fresh)
+                RetrofitClient.API_KEY,
+                page,
+                selectedGenre?.id,
+                Utils.today(),
+                RetrofitClient.cacheControl(fresh)
             )
         }
         // A new genre is a new list, so it starts from the top with a scroll
