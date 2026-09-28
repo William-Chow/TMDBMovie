@@ -20,8 +20,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +34,7 @@ import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.movielist.tmdb.R
 import com.movielist.tmdb.ads.AdsConsentManager
+import com.movielist.tmdb.util.Utils
 
 /**
  * A centred column at least as tall as the space it is given, inside a
@@ -77,6 +80,16 @@ fun PullableContent(modifier: Modifier = Modifier, content: @Composable BoxScope
             content = content
         )
     }
+}
+
+/**
+ * The message to show for a failed request. Worked out once per failure,
+ * while its connectivity check still describes the moment it failed.
+ */
+@Composable
+fun rememberErrorMessage(error: Throwable): String {
+    val context = LocalContext.current
+    return remember(error) { Utils.errorMessage(context, error) }
 }
 
 /** Full-screen spinner, for the first load of a screen. */

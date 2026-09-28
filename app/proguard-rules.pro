@@ -22,3 +22,9 @@
 # type of each suspend function's return value, so both need to survive R8.
 -keepattributes Signature
 -keepattributes AnnotationDefault,RuntimeVisibleAnnotations
+
+# The default ViewModel factory creates the screens' ViewModels reflectively,
+# through their no-argument or (SavedStateHandle) constructors.
+-keepclassmembers class com.movielist.tmdb.ui.*ViewModel {
+    public <init>(...);
+}

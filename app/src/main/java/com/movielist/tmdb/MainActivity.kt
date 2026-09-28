@@ -24,20 +24,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.movielist.tmdb.ads.AdsConsentManager
-import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Movie
+import com.movielist.tmdb.ui.MainViewModel
 import com.movielist.tmdb.ui.MoviePager
 import com.movielist.tmdb.ui.components.AdBanner
 import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PullableContent
-import com.movielist.tmdb.ui.rememberMoviePager
+import com.movielist.tmdb.ui.components.rememberErrorMessage
 import com.movielist.tmdb.ui.theme.TMDBMovieTheme
 import com.movielist.tmdb.util.Utils
-import kotlinx.coroutines.launch
 
 /** Pages left ahead of the user before the next page is requested. */
 private const val PREFETCH_DISTANCE = 3
@@ -73,16 +73,10 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun MainScreen() {
+    fun MainScreen(viewModel: MainViewModel = viewModel()) {
         val context = LocalContext.current
-        val scope = rememberCoroutineScope()
-        val pager = rememberMoviePager(Unit) { page, fresh ->
-            RetrofitClient.movieApi.getDiscover(
-                RetrofitClient.API_KEY, page, null, Utils.today(), RetrofitClient.cacheControl(fresh)
-            )
-        }
-
-        LaunchedEffect(pager) { pager.loadNext(context) }
+        // Owned by the ViewModel, so the carousel survives rotation.
+        val pager = viewModel.pager
 
         // A page that fails after the first one leaves the loaded movies on
         // screen, so the failure is reported without replacing them. Clearing
@@ -91,7 +85,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(pager.error) {
             val error = pager.error
             if (error != null && pager.movies.isNotEmpty()) {
-                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, Utils.errorMessage(context, error), Toast.LENGTH_SHORT).show()
                 pager.dismissError()
             }
         }
@@ -112,10 +106,7 @@ class MainActivity : ComponentActivity() {
                         }
                         // Pulling a sideways carousel down is easy to miss (and
                         // not reachable for everyone), so refresh has a button too.
-                        IconButton(
-                            onClick = { scope.launch { pager.refresh(context) } },
-                            enabled = !pager.isRefreshing
-                        ) {
+                        IconButton(onClick = { pager.refresh() }, enabled = !pager.isRefreshing) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                         }
                     }
@@ -135,15 +126,16 @@ class MainActivity : ComponentActivity() {
         ) { paddingValues ->
             PullToRefreshBox(
                 isRefreshing = pager.isRefreshing,
-                onRefresh = { scope.launch { pager.refresh(context) } },
+                onRefresh = { pager.refresh() },
                 modifier = Modifier.padding(paddingValues).fillMaxSize()
             ) {
+                val error = pager.error
                 when {
                     pager.isLoadingFirstPage -> LoadingState()
 
-                    pager.movies.isEmpty() && pager.error != null -> ErrorState(
-                        message = pager.error!!,
-                        onRetry = { scope.launch { pager.retry(context) } }
+                    pager.movies.isEmpty() && error != null -> ErrorState(
+                        message = rememberErrorMessage(error),
+                        onRetry = { pager.retry() }
                     )
 
                     pager.movies.isEmpty() -> EmptyState(stringResource(R.string.no_movies))
@@ -158,8 +150,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MovieCarousel(pager: MoviePager) {
-        val context = LocalContext.current
-
         // A refreshed list is a new list, so it starts again from its first
         // movie instead of wherever the old one had been swiped to.
         key(pager.refreshCount) {
@@ -169,7 +159,7 @@ class MainActivity : ComponentActivity() {
             // list keeps extending as long as the user keeps going.
             LaunchedEffect(pagerState.currentPage, pager.movies.size) {
                 if (pagerState.currentPage >= pager.movies.size - PREFETCH_DISTANCE) {
-                    pager.loadNext(context)
+                    pager.loadNext()
                 }
             }
 
