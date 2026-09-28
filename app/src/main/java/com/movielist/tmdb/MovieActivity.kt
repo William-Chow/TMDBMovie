@@ -1,6 +1,7 @@
 package com.movielist.tmdb
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
@@ -31,6 +32,7 @@ import com.google.android.gms.ads.*
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.movielist.tmdb.ads.AdsConsentManager
+import com.movielist.tmdb.ads.InterstitialPacer
 import com.movielist.tmdb.data.FavoritesStore
 import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Cast
@@ -60,10 +62,17 @@ class MovieActivity : ComponentActivity() {
         finishAfterInterstitial =
             savedInstanceState?.getBoolean(STATE_FINISH_AFTER_INTERSTITIAL) == true
 
+        if (savedInstanceState == null) {
+            // One visit per screen opened, not per rotation.
+            InterstitialPacer.shared.onDetailVisited()
+        }
+
         AdsConsentManager.refresh(this)
         // Consent was gathered by the launcher activity; without it no ad is
-        // requested at all.
-        if (!interstitialShown && AdsConsentManager.canRequestAds) {
+        // requested at all. Nor is one loaded that pacing would not let show.
+        if (!interstitialShown && AdsConsentManager.canRequestAds &&
+            InterstitialPacer.shared.isAdDue(SystemClock.elapsedRealtime())
+        ) {
             loadInterstitial()
         }
 
@@ -110,12 +119,14 @@ class MovieActivity : ComponentActivity() {
 
     /**
      * Exits the screen, showing the interstitial on the way out if one is
-     * ready. Leaving is a deliberate transition, so the ad never interrupts
-     * the user mid-read.
+     * ready and [InterstitialPacer] allows it. Leaving is a deliberate
+     * transition, so the ad never interrupts the user mid-read.
      */
     private fun leaveScreen() {
         val ad = mInterstitialAd
-        if (interstitialShown || ad == null) {
+        if (interstitialShown || ad == null ||
+            !InterstitialPacer.shared.isAdDue(SystemClock.elapsedRealtime())
+        ) {
             // Never hold the user on the screen waiting for an ad to load.
             finish()
             return
@@ -124,6 +135,8 @@ class MovieActivity : ComponentActivity() {
         finishAfterInterstitial = true
         mInterstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() =
+                InterstitialPacer.shared.onAdShown(SystemClock.elapsedRealtime())
             override fun onAdDismissedFullScreenContent() = finish()
             override fun onAdFailedToShowFullScreenContent(adError: AdError) = finish()
         }

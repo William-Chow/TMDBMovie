@@ -56,10 +56,7 @@
     <string name="error_missing_api_key">This build has no TMDB API key. Add tmdb.apiKey to local.properties and rebuild the app.</string>
     <string name="press_back_again">Press back again to leave the app.</string>
 
-    <!-- AdMob -->
-    <string name="admob_id">ca-app-pub-4541063798492496~7778027755</string>
-    <string name="admob_banner_ad_unit_id">ca-app-pub-4541063798492496/9305326872</string>
-    <string name="admob_interstitial_ad_unit_id">ca-app-pub-4541063798492496/3290582868</string>
+    <!-- AdMob IDs are set per build type in app/build.gradle (test units in debug). -->
     <plurals name="rating_votes">
         <item quantity="one">%1$.1f / 10 (%2$d vote)</item>
         <item quantity="other">%1$.1f / 10 (%2$d votes)</item>

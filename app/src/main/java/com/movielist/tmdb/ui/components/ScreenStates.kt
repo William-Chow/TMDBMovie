@@ -167,7 +167,10 @@ fun AdBanner(modifier: Modifier = Modifier) {
                 adUnitId = context.getString(R.string.admob_banner_ad_unit_id)
                 loadAd(AdRequest.Builder().build())
             }
-        }
+        },
+        // Leaving composition (the screen closed, or consent went away) is the
+        // end of this banner: stop its refreshes and free its WebView.
+        onRelease = { adView -> adView.destroy() }
     )
 }
 

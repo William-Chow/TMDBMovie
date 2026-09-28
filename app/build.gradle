@@ -62,7 +62,17 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Google's sample AdMob app and ad units: they always fill, and
+            // clicks while developing never count against the real account.
+            resValue "string", "admob_id", "ca-app-pub-3940256099942544~3347511713"
+            resValue "string", "admob_banner_ad_unit_id", "ca-app-pub-3940256099942544/6300978111"
+            resValue "string", "admob_interstitial_ad_unit_id", "ca-app-pub-3940256099942544/1033173712"
+        }
         release {
+            resValue "string", "admob_id", "ca-app-pub-4541063798492496~7778027755"
+            resValue "string", "admob_banner_ad_unit_id", "ca-app-pub-4541063798492496/9305326872"
+            resValue "string", "admob_interstitial_ad_unit_id", "ca-app-pub-4541063798492496/3290582868"
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.release
             }
