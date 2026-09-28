@@ -42,8 +42,9 @@ written in Kotlin with Jetpack Compose.
 - Pull-to-refresh (plus a refresh button on the home screen) that always
   fetches fresh data, offline fallback to the last cached copy, and retry on
   every failure
-- Screen state survives rotation, and the search term and genre survive
-  process death
+- Every screen keeps its data across rotation, including the movie on the
+  detail screen; after process death the search term, the genre and the
+  open movie come back and are loaded again
 - **About**: version, TMDB attribution, and ad privacy settings for users in
   regions where ad consent applies
 
@@ -72,10 +73,11 @@ Then build as usual:
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-Unit tests cover the pager, the screens' ViewModels, the HTTP cache/offline
-interceptors (against MockWebServer), the TMDB API requests, ad pacing and
-the URL helpers. `app/src/androidTest` has an on-device test for favourites
-(`./gradlew connectedDebugAndroidTest`).
+Unit tests cover the pager, the screens' ViewModels (the detail screen's
+too), the HTTP cache/offline interceptors (against MockWebServer), the TMDB
+API requests, ad pacing and the URL helpers. `app/src/androidTest` has an
+on-device test for favourites (`./gradlew connectedDebugAndroidTest`), which
+CI runs on an emulator.
 
 ### Ads
 
@@ -108,9 +110,15 @@ exist, release builds are produced **unsigned** instead of failing.
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on pushes to `main` and `claude/**` and on
-demand. It sets up JDK 17 and the Android SDK, then runs
-`testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`, and
-uploads the test and lint reports and the debug APK.
+demand, as two independent jobs:
+
+- **build** sets up JetBrains Runtime 17 and the Android SDK, runs
+  `testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`, then
+  an unsigned `assembleRelease` so R8 and the keep rules get exercised, and
+  uploads the test and lint reports (with R8's `missing_rules.txt` when it
+  fails) and the debug APK.
+- **instrumented** boots an API 34 emulator (google_apis, x86_64) and runs
+  `connectedDebugAndroidTest`, uploading its reports whether it passes or not.
 
 CI needs no secrets: it builds without a TMDB key and without signing. Don't
 add the real TMDB key to CI, since anyone who can read this public repository
