@@ -1,18 +1,31 @@
+# Gradle and build output
+.gradle/
+/build
+/captures
+.externalNativeBuild
+.cxx
 *.iml
-.gradle
-/local.properties
+
+# Machine-local configuration and secrets: never commit these
+local.properties
 key.properties
+*.jks
+*.keystore
+app/keystore/
+app/google-services.json
+
+# Build artifacts
+*.apk
+*.aab
+app/release/
+
+# Android Studio: caches and per-user or per-machine state
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+
+# OS files
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-key.properties
-app/google-services.json

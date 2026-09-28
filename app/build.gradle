@@ -4,10 +4,21 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// Release signing is optional. key.properties is never committed (copy
+// key.properties.example); without it, or when the keystore it names does not
+// exist, release builds come out unsigned, so CI and fresh clones need no
+// secrets.
 def keystorePropertiesFile = rootProject.file("key.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def releaseStoreFile = keystoreProperties['storeFile'] ?
+        rootProject.file(keystoreProperties['storeFile']) : null
+def hasReleaseSigning = releaseStoreFile != null && releaseStoreFile.exists()
+if (keystorePropertiesFile.exists() && !hasReleaseSigning) {
+    logger.warn("key.properties does not point at an existing storeFile; " +
+            "release builds will be unsigned.")
 }
 
 // The TMDB key lives in local.properties, which is not tracked. A checkout
@@ -34,17 +45,10 @@ android {
         buildConfigField "String", "TMDB_API_KEY",
                 "\"${localProperties.getProperty('tmdb.apiKey', '')}\""
     }
-
-    /*
-    storeFile=app/keystore/keystore.jks
-    storePassword=android
-    keyAlias=android
-    keyPassword=android
-     */
     signingConfigs {
-        release {
-            if (keystorePropertiesFile.exists()) {
-                storeFile = rootProject.file(keystoreProperties['storeFile'])
+        if (hasReleaseSigning) {
+            release {
+                storeFile = releaseStoreFile
                 storePassword = keystoreProperties['storePassword']
                 keyAlias = keystoreProperties['keyAlias']
                 keyPassword = keystoreProperties['keyPassword']
@@ -54,7 +58,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

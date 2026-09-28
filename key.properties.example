@@ -1,0 +1,13 @@
+# Release signing template. Copy this file to key.properties (git-ignored)
+# and fill in your own values; never commit the real file or the keystore.
+#
+# storeFile is resolved relative to the project root. app/keystore/ and
+# *.jks / *.keystore are git-ignored, but keeping the keystore outside the
+# repository altogether is safer.
+#
+# Without key.properties, or when storeFile does not exist, release builds
+# are simply left unsigned.
+storeFile=app/keystore/upload-keystore.jks
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME
