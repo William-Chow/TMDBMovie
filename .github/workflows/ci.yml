@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Unit tests, lint and debug build
+    name: Unit tests, lint, debug and release builds
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -52,6 +52,14 @@ jobs:
       - name: Test, lint and build
         run: ./gradlew --stacktrace testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
 
+      # Release builds run R8 (minifyEnabled, shrinkResources), a different
+      # path from debug: a new library or a model class without keep rules
+      # breaks here first. Without key.properties the APK is left unsigned.
+      # This proves the rules build, not that the shrunk app runs: Jackson
+      # and Retrofit still need a check on a device.
+      - name: Release build (R8, unsigned)
+        run: ./gradlew --stacktrace assembleRelease
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -60,6 +68,7 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
+            app/build/outputs/mapping/release/missing_rules.txt
           if-no-files-found: ignore
 
       - name: Upload debug APK
