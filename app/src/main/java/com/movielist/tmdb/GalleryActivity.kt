@@ -7,9 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -85,13 +85,13 @@ class GalleryActivity : ComponentActivity() {
         val pager = rememberMoviePager(selectedGenre?.id) { page ->
             RetrofitClient.movieApi.getDiscover(RetrofitClient.API_KEY, page, selectedGenre?.id)
         }
-        val gridState = rememberLazyGridState()
+        // A new genre is a new list, so it starts from the top with a scroll
+        // state of its own. Resetting the old state with scrollToItem(0)
+        // before loading never returns: scrolling waits for the grid's first
+        // layout, and the grid is only composed once there are movies.
+        val gridState = remember(pager) { LazyGridState() }
 
-        LaunchedEffect(pager) {
-            // A new genre is a new list; don't leave the user mid-scroll in it.
-            gridState.scrollToItem(0)
-            pager.loadNext(context)
-        }
+        LaunchedEffect(pager) { pager.loadNext(context) }
 
         val lastVisibleIndex by remember(gridState) {
             derivedStateOf { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }

@@ -6,8 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -83,11 +83,13 @@ class SearchActivity : ComponentActivity() {
         val pager = rememberMoviePager(submittedQuery) { page ->
             RetrofitClient.movieApi.getSearch(RetrofitClient.API_KEY, submittedQuery, page)
         }
-        val listState = rememberLazyListState()
+        // A new term is a new list, so it starts from the top with a scroll
+        // state of its own. Resetting the old state with scrollToItem(0)
+        // before loading never returns: scrolling waits for the list's first
+        // layout, and the list is only composed once there are results.
+        val listState = remember(pager) { LazyListState() }
 
         LaunchedEffect(pager) {
-            // A new term is a new list; don't leave the user mid-scroll in it.
-            listState.scrollToItem(0)
             if (submittedQuery.isNotEmpty()) pager.loadNext(context)
         }
 
