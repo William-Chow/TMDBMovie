@@ -12,6 +12,7 @@ import com.movielist.tmdb.R
 import com.movielist.tmdb.network.MissingApiKeyException
 import com.movielist.tmdb.network.isUnsatisfiedCacheOnlyResponse
 import com.movielist.tmdb.network.model.Genre
+import com.movielist.tmdb.network.model.Video
 import retrofit2.HttpException
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -84,6 +85,42 @@ class Utils {
 
         /** Today in the device's time zone, in the yyyy-MM-dd form TMDB's date filters take. */
         fun today(): String = LocalDate.now().toString()
+
+        /**
+         * Languages to ask TMDB for trailers in: English, clips with no
+         * language set ("null", how many trailers are filed) and the film's
+         * [originalLanguage], without which many non-English films have none.
+         */
+        fun videoLanguages(originalLanguage: String?): String {
+            val original = originalLanguage?.trim()?.lowercase()
+            return if (original.isNullOrEmpty() || original == "en" || original == "null") {
+                "en,null"
+            } else {
+                "en,null,$original"
+            }
+        }
+
+        /**
+         * Picks the most trailer-like YouTube clip TMDB reported, if any: an
+         * official trailer before any trailer, then a teaser, then any clip.
+         * Among equals English comes first, then untagged clips, then others.
+         */
+        fun pickTrailerKey(videos: List<Video>?): String? {
+            val youtube = videos.orEmpty()
+                .filter { it.site.equals("YouTube", ignoreCase = true) && !it.key.isNullOrBlank() }
+                .sortedBy {
+                    when (it.iso_639_1?.lowercase()) {
+                        "en" -> 0
+                        null, "", "xx" -> 1
+                        else -> 2
+                    }
+                }
+            val trailers = youtube.filter { it.type.equals("Trailer", ignoreCase = true) }
+            return (trailers.firstOrNull { it.official == true }
+                ?: trailers.firstOrNull()
+                ?: youtube.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
+                ?: youtube.firstOrNull())?.key
+        }
 
         fun getGenres(genres: List<Genre>?): String =
             genres.orEmpty().mapNotNull { it.name }.joinToString(", ")

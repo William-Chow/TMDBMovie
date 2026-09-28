@@ -56,7 +56,12 @@ interface MovieApi {
     suspend fun getCredits(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Credits
 
     // Get Video Key
-    // movie/76600/videos?api_key={api_key}&language=en-US
+    // movie/76600/videos?api_key={api_key}&language=en-US&include_video_language=en,null,ko
     @GET("movie/{movie_id}/videos?language=en-US")
-    suspend fun getVideo(@Path("movie_id") movie_id: Int, @Query("api_key") api_key: String): Videos
+    suspend fun getVideo(
+        @Path("movie_id") movie_id: Int,
+        @Query("api_key") api_key: String,
+        // Without it only en-US clips come back; see Utils.videoLanguages.
+        @Query("include_video_language") include_video_language: String
+    ): Videos
 }

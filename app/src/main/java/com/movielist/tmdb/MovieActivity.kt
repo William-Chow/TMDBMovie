@@ -37,7 +37,6 @@ import com.movielist.tmdb.data.FavoritesStore
 import com.movielist.tmdb.network.RetrofitClient
 import com.movielist.tmdb.network.model.Cast
 import com.movielist.tmdb.network.model.Movie
-import com.movielist.tmdb.network.model.Video
 import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.ErrorState
 import com.movielist.tmdb.ui.components.LoadingState
@@ -178,10 +177,20 @@ class MovieActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(movieID, reloadToken) {
-            if (movieID == 0) return@LaunchedEffect
+        // Waits for the movie itself: many non-English films only have a
+        // trailer filed under their original language, which is asked for too.
+        val loadedMovie = movie
+        LaunchedEffect(loadedMovie) {
+            trailerKey = null
+            if (loadedMovie == null) return@LaunchedEffect
             trailerKey = try {
-                pickTrailer(RetrofitClient.movieApi.getVideo(movieID, RetrofitClient.API_KEY).results)
+                Utils.pickTrailerKey(
+                    RetrofitClient.movieApi.getVideo(
+                        movieID,
+                        RetrofitClient.API_KEY,
+                        Utils.videoLanguages(loadedMovie.original_language)
+                    ).results
+                )
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
@@ -366,18 +375,6 @@ class MovieActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    /** Picks the most trailer-like YouTube clip TMDB reported, if any. */
-    private fun pickTrailer(videos: List<Video>?): String? {
-        val youtube = videos.orEmpty().filter {
-            it.site.equals("YouTube", ignoreCase = true) && !it.key.isNullOrBlank()
-        }
-        val trailers = youtube.filter { it.type.equals("Trailer", ignoreCase = true) }
-        return (trailers.firstOrNull { it.official == true }
-            ?: trailers.firstOrNull()
-            ?: youtube.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
-            ?: youtube.firstOrNull())?.key
     }
 
     private companion object {

@@ -83,6 +83,18 @@ class MovieApiTest {
     }
 
     @Test
+    fun videos_askForUntaggedAndOriginalLanguageClipsToo(): Unit = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"id": 1, "results": []}"""))
+
+        api.getVideo(1, "key", "en,null,ko")
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/3/movie/1/videos", url.encodedPath)
+        assertEquals("en-US", url.queryParameter("language"))
+        assertEquals("en,null,ko", url.queryParameter("include_video_language"))
+    }
+
+    @Test
     fun moviesPage_isParsed_andUnknownFieldsAreIgnored(): Unit = runBlocking {
         enqueuePage(
             """

@@ -1,6 +1,7 @@
 package com.movielist
 
 import com.movielist.tmdb.network.model.Genre
+import com.movielist.tmdb.network.model.Video
 import com.movielist.tmdb.util.Utils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -44,5 +45,54 @@ class UtilsTest {
 
         assertEquals("Action, Drama", Utils.getGenres(listOf(action, unnamed, drama)))
         assertEquals("", Utils.getGenres(null))
+    }
+
+    @Test
+    fun videoLanguages_addsTheOriginalLanguageWhenItIsNotEnglish() {
+        assertEquals("en,null,ko", Utils.videoLanguages("ko"))
+        assertEquals("en,null,ja", Utils.videoLanguages(" JA "))
+        assertEquals("en,null", Utils.videoLanguages("en"))
+        assertEquals("en,null", Utils.videoLanguages(null))
+        assertEquals("en,null", Utils.videoLanguages(""))
+    }
+
+    private fun video(key: String?, type: String, language: String?, official: Boolean = false, site: String = "YouTube") =
+        Video().apply {
+            this.key = key
+            this.type = type
+            this.site = site
+            iso_639_1 = language
+            this.official = official
+        }
+
+    @Test
+    fun pickTrailerKey_prefersAnOfficialTrailer_thenAnyTrailer_thenATeaser() {
+        assertEquals(
+            "official",
+            Utils.pickTrailerKey(
+                listOf(
+                    video("teaser", "Teaser", "en"),
+                    video("unofficial", "Trailer", "en"),
+                    video("official", "Trailer", "en", official = true)
+                )
+            )
+        )
+        assertEquals("teaser", Utils.pickTrailerKey(listOf(video("clip", "Clip", "en"), video("teaser", "Teaser", "en"))))
+        assertEquals("clip", Utils.pickTrailerKey(listOf(video("clip", "Featurette", "en"))))
+    }
+
+    @Test
+    fun pickTrailerKey_prefersEnglish_butFallsBackToTheOriginalLanguage() {
+        val korean = video("ko-trailer", "Trailer", "ko", official = true)
+        val english = video("en-trailer", "Trailer", "en", official = true)
+
+        assertEquals("en-trailer", Utils.pickTrailerKey(listOf(korean, english)))
+        assertEquals("ko-trailer", Utils.pickTrailerKey(listOf(korean)))
+    }
+
+    @Test
+    fun pickTrailerKey_ignoresOtherSitesAndMissingKeys() {
+        assertNull(Utils.pickTrailerKey(listOf(video("v", "Trailer", "en", site = "Vimeo"), video(null, "Trailer", "en"))))
+        assertNull(Utils.pickTrailerKey(null))
     }
 }
