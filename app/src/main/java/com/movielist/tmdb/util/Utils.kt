@@ -34,6 +34,9 @@ class Utils {
         const val youtubeURL = "https://www.youtube.com/watch?v="
         const val tmdbURL = "https://www.themoviedb.org/"
 
+        /** Intent extra carrying the id of the movie MovieActivity shows. */
+        const val movieExtra = "movie"
+
         /**
          * Whether the device has a network that claims internet access. Only
          * used to word an error: requests always try the network, so one that
@@ -148,7 +151,7 @@ class Utils {
 
         fun intent(context: Context, movieID: Int?, className: Class<*>?) {
             val intent = Intent(context, className)
-            intent.putExtra("movie", movieID)
+            intent.putExtra(movieExtra, movieID)
             context.startActivity(intent)
         }
 
