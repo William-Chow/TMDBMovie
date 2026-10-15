@@ -20,7 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,6 +31,7 @@ import com.movielist.tmdb.ui.MoviePager
 import com.movielist.tmdb.ui.components.AdBanner
 import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.components.ErrorState
+import com.movielist.tmdb.ui.components.ErrorToast
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PullableContent
 import com.movielist.tmdb.ui.components.TmdbImage
@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun MainScreen(viewModel: MainViewModel = viewModel()) {
-        val context = LocalContext.current
         // Owned by the ViewModel, so the carousel survives rotation.
         val pager = viewModel.pager
 
@@ -82,13 +81,10 @@ class MainActivity : ComponentActivity() {
         // screen, so the failure is reported without replacing them. Clearing
         // it afterwards matters: the pager refuses to load while an error is
         // pending, and in a carousel there is no error row to retry from.
-        LaunchedEffect(pager.error) {
-            val error = pager.error
-            if (error != null && pager.movies.isNotEmpty()) {
-                Toast.makeText(context, Utils.errorMessage(context, error), Toast.LENGTH_SHORT).show()
-                pager.dismissError()
-            }
-        }
+        ErrorToast(pager.error.takeIf { pager.movies.isNotEmpty() }) { pager.dismissError() }
+        // A failed refresh keeps the carousel it was to replace, so it is
+        // only reported.
+        ErrorToast(pager.refreshError) { pager.dismissRefreshError() }
 
         Scaffold(
             topBar = {
@@ -106,7 +102,12 @@ class MainActivity : ComponentActivity() {
                         }
                         // Pulling a sideways carousel down is easy to miss (and
                         // not reachable for everyone), so refresh has a button too.
-                        IconButton(onClick = { pager.refresh() }, enabled = !pager.isRefreshing) {
+                        // Off until there is a first page to refresh; a next
+                        // page still loading does not hold it up.
+                        IconButton(
+                            onClick = { pager.refresh() },
+                            enabled = !pager.isRefreshing && !pager.isLoadingFirstPage
+                        ) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                         }
                         OverflowMenu()

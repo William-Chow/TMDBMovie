@@ -1,5 +1,6 @@
 package com.movielist.tmdb.ui.components
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +99,22 @@ fun rememberErrorMessage(error: Throwable): String {
     return remember(error) { Utils.errorMessage(context, error) }
 }
 
+/**
+ * Shows [error] as a toast once, then calls [onShown] to drop it. For
+ * failures that leave the screen's content in place, so there is no error
+ * state to show them in, or none the user would see from where they are.
+ */
+@Composable
+fun ErrorToast(error: Throwable?, onShown: () -> Unit) {
+    val context = LocalContext.current
+    LaunchedEffect(error) {
+        if (error != null) {
+            Toast.makeText(context, Utils.errorMessage(context, error), Toast.LENGTH_SHORT).show()
+            onShown()
+        }
+    }
+}
+
 /** Full-screen spinner, for the first load of a screen. */
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
@@ -106,11 +124,13 @@ fun LoadingState(modifier: Modifier = Modifier) {
 }
 
 /**
- * Shown instead of content when a request failed. Always offers a way back —
- * a dead end with only a spinner is what this replaces.
+ * Shown instead of content when a request failed. Offers a retry whenever
+ * one can help — a dead end with only a spinner is what this replaces.
+ * [onRetry] is null only when retrying cannot change the outcome, so no
+ * button is shown that would do nothing.
  */
 @Composable
-fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorState(message: String, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
     ScrollableCenteredColumn(modifier) {
         Image(
             painter = painterResource(R.drawable.ic_no_exist),
@@ -123,7 +143,9 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(vertical = 16.dp)
         )
-        Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        if (onRetry != null) {
+            Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        }
     }
 }
 

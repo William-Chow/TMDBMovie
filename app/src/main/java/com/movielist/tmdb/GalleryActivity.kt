@@ -29,6 +29,7 @@ import com.movielist.tmdb.ui.GalleryViewModel
 import com.movielist.tmdb.ui.components.AdBottomBar
 import com.movielist.tmdb.ui.components.EmptyState
 import com.movielist.tmdb.ui.components.ErrorState
+import com.movielist.tmdb.ui.components.ErrorToast
 import com.movielist.tmdb.ui.components.LoadingState
 import com.movielist.tmdb.ui.components.PageErrorRow
 import com.movielist.tmdb.ui.components.PageLoadingRow
@@ -68,6 +69,11 @@ class GalleryActivity : ComponentActivity() {
         // before loading never returns: scrolling waits for the grid's first
         // layout, and the grid is only composed once there are movies.)
         val gridState = rememberSaveable(pager, saver = LazyGridState.Saver) { LazyGridState() }
+
+        // A failed pull-to-refresh keeps the grid it was to replace. Reported
+        // here, not as the error row at the end of a grid the user is at the
+        // top of.
+        ErrorToast(pager.refreshError) { pager.dismissRefreshError() }
 
         val lastVisibleIndex by remember(gridState) {
             derivedStateOf { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }

@@ -51,6 +51,8 @@ object RetrofitClient {
             .addInterceptor(StaleCacheFallbackInterceptor(OFFLINE_MAX_STALE_DAYS))
             // TMDB sends no cache headers, so responses get a short max-age.
             .addNetworkInterceptor(CacheHeaderInterceptor(ONLINE_MAX_AGE_SECONDS))
+            // After the cache, so discover's daily date never reaches its keys.
+            .addNetworkInterceptor(ReleaseDateCutoffInterceptor())
             .build()
 
         Retrofit.Builder()

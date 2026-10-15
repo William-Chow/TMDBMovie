@@ -3,6 +3,8 @@ package com.movielist
 import com.movielist.tmdb.network.ApiKeyInterceptor
 import com.movielist.tmdb.network.CacheHeaderInterceptor
 import com.movielist.tmdb.network.MissingApiKeyException
+import com.movielist.tmdb.network.ReleaseDateCutoff
+import com.movielist.tmdb.network.ReleaseDateCutoffInterceptor
 import com.movielist.tmdb.network.StaleCacheFallbackInterceptor
 import com.movielist.tmdb.network.isUnsatisfiedCacheOnlyResponse
 import okhttp3.Cache
@@ -59,12 +61,20 @@ class InterceptorsTest {
             if (offline) throw UnknownHostException("offline") else chain.proceed(chain.request())
         }
         .addNetworkInterceptor(CacheHeaderInterceptor(maxAgeSeconds = 0))
+        .addNetworkInterceptor(ReleaseDateCutoffInterceptor())
         .build()
 
     private fun request(path: String = "/3/movie/1?api_key=abc", noCache: Boolean = false): Request =
         Request.Builder()
             .url(server.url(path))
             .apply { if (noCache) cacheControl(CacheControl.FORCE_NETWORK) }
+            .build()
+
+    /** A discover request as the app makes it, its release date cutoff as a tag. */
+    private fun discover(cutoff: String): Request =
+        Request.Builder()
+            .url(server.url("/3/discover/movie?api_key=abc&page=1"))
+            .tag(ReleaseDateCutoff::class.java, ReleaseDateCutoff(cutoff))
             .build()
 
     private fun OkHttpClient.fetch(request: Request): Response = newCall(request).execute()
@@ -110,6 +120,22 @@ class InterceptorsTest {
             assertEquals("v1", response.body!!.string())
             assertNotNull(response.cacheResponse)
             assertNull(response.networkResponse)
+        }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun releaseDateCutoff_isSent_butOfflineTheNextDayTheCachedCopyIsStillFound() {
+        server.enqueue(MockResponse().setBody("yesterday"))
+        val client = appLikeClient()
+        client.fetch(discover(cutoff = "2026-10-15")).use { assertEquals("yesterday", it.body!!.string()) }
+        assertEquals("2026-10-15", server.takeRequest().requestUrl!!.queryParameter("release_date.lte"))
+
+        offline = true
+        client.fetch(discover(cutoff = "2026-10-16")).use { response ->
+            assertEquals(200, response.code)
+            assertEquals("yesterday", response.body!!.string())
+            assertNotNull(response.cacheResponse)
         }
         assertEquals(1, server.requestCount)
     }

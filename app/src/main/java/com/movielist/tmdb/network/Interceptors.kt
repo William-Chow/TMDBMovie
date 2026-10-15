@@ -45,6 +45,32 @@ class CacheHeaderInterceptor(private val maxAgeSeconds: Int) : Interceptor {
 }
 
 /**
+ * The latest release date (yyyy-MM-dd) a discover request may return. It
+ * travels as a request tag, not a query parameter, so that
+ * [ReleaseDateCutoffInterceptor] only adds it on the way to the network.
+ */
+class ReleaseDateCutoff(val date: String)
+
+/**
+ * Network interceptor: sends a request's [ReleaseDateCutoff] as
+ * `release_date.lte`, but files the response in the cache under the URL
+ * without it. The date changes every day, and a copy cached under
+ * yesterday's URL could never be looked up again, which left
+ * [StaleCacheFallbackInterceptor] nothing to answer with offline.
+ */
+class ReleaseDateCutoffInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val cutoff = request.tag(ReleaseDateCutoff::class.java) ?: return chain.proceed(request)
+        val sent = request.newBuilder()
+            .url(request.url.newBuilder().setQueryParameter("release_date.lte", cutoff.date).build())
+            .build()
+        // The cache keys a response on the URL of the request it carries.
+        return chain.proceed(sent).newBuilder().request(request).build()
+    }
+}
+
+/**
  * Application interceptor: when the network fails, answers from the cache
  * instead, however stale (up to [maxStaleDays]).
  *

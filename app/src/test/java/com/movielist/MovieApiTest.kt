@@ -1,8 +1,11 @@
 package com.movielist
 
 import com.movielist.tmdb.network.MovieApi
+import com.movielist.tmdb.network.ReleaseDateCutoff
+import com.movielist.tmdb.network.ReleaseDateCutoffInterceptor
 import com.movielist.tmdb.network.RetrofitClient
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -24,6 +27,8 @@ class MovieApiTest {
         server.start()
         api = Retrofit.Builder()
             .baseUrl(server.url("/3/"))
+            // As in the app, which adds discover's release date cutoff on the way out.
+            .client(OkHttpClient.Builder().addNetworkInterceptor(ReleaseDateCutoffInterceptor()).build())
             .addConverterFactory(JacksonConverterFactory.create())
             .build()
             .create(MovieApi::class.java)
@@ -43,8 +48,8 @@ class MovieApiTest {
         enqueuePage()
         enqueuePage()
 
-        api.getDiscover("key", 2, null, "2025-01-31", RetrofitClient.cacheControl(fresh = false))
-        api.getDiscover("key", 1, 28, "2025-01-31", RetrofitClient.cacheControl(fresh = true))
+        api.getDiscover("key", 2, null, ReleaseDateCutoff("2025-01-31"), RetrofitClient.cacheControl(fresh = false))
+        api.getDiscover("key", 1, 28, ReleaseDateCutoff("2025-01-31"), RetrofitClient.cacheControl(fresh = true))
 
         val normal = server.takeRequest()
         assertEquals("/3/discover/movie", normal.requestUrl!!.encodedPath)
@@ -62,7 +67,7 @@ class MovieApiTest {
     fun discover_onlyAsksForMoviesAlreadyReleased(): Unit = runBlocking {
         enqueuePage()
 
-        api.getDiscover("key", 1, null, "2025-01-31", null)
+        api.getDiscover("key", 1, null, ReleaseDateCutoff("2025-01-31"), null)
 
         val url = server.takeRequest().requestUrl!!
         assertEquals("release_date.desc", url.queryParameter("sort_by"))
@@ -104,7 +109,7 @@ class MovieApiTest {
             """.trimIndent()
         )
 
-        val page = api.getDiscover("key", 1, null, "2025-01-31", null)
+        val page = api.getDiscover("key", 1, null, ReleaseDateCutoff("2025-01-31"), null)
 
         assertEquals(3, page.total_pages)
         val movie = page.results!!.single()
