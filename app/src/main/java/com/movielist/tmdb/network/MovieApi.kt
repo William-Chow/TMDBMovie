@@ -10,6 +10,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Tag
 
 @Keep
 interface MovieApi {
@@ -23,9 +24,10 @@ interface MovieApi {
         @Query("page") page: Int,
         // Omitted from the query string when null, which asks for every genre.
         @Query("with_genres") with_genres: Int?,
-        // yyyy-MM-dd, normally today: newest-first would otherwise open with
-        // films that have not been released yet.
-        @Query("release_date.lte") releasedOnOrBefore: String,
+        // Sent as release_date.lte, normally today: newest-first would
+        // otherwise open with films that have not been released yet. A tag,
+        // not a @Query, so the cache ignores it; see ReleaseDateCutoffInterceptor.
+        @Tag releasedOnOrBefore: ReleaseDateCutoff,
         // See RetrofitClient.cacheControl; null sends no header at all.
         @Header("Cache-Control") cacheControl: String?
     ): Movies

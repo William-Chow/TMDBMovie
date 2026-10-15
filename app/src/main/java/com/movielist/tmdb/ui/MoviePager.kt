@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -40,9 +41,21 @@ class MoviePager(
     var isLoading by mutableStateOf(false)
         private set
 
-    /** The last failure, kept until [retry], [dismissError] or a successful [refresh]. */
+    /**
+     * The last failed page load, kept until [retry], [dismissError] or a
+     * successful [refresh]. No further page is loaded while it is set.
+     */
     var error by mutableStateOf<Throwable?>(null)
         private set
+
+    /**
+     * A [refresh] that failed while the list it was to replace is still on
+     * screen. That list stays usable and paging carries on, so screens only
+     * report this, wherever the user has scrolled to, then [dismissRefreshError].
+     */
+    var refreshError by mutableStateOf<Throwable?>(null)
+        private set
+
     var endReached by mutableStateOf(false)
         private set
     var isRefreshing by mutableStateOf(false)
@@ -56,6 +69,7 @@ class MoviePager(
         private set
 
     private var nextPage = 1
+    private var loadJob: Job? = null
 
     /** True while the very first page is in flight and there is nothing to show yet. */
     val isLoadingFirstPage: Boolean get() = isLoading && movies.isEmpty()
@@ -78,9 +92,12 @@ class MoviePager(
      * the new first page arrives, so the grid does not blink empty.
      */
     fun refresh() {
-        // A page load already in flight would append its result on top of the
-        // refreshed list, interleaving two different page sequences.
-        if (isRefreshing || isLoading) return
+        // Before the first page arrives there is nothing to refresh, and that
+        // page is already on its way.
+        if (isRefreshing || isLoadingFirstPage) return
+        // A next page still in flight would be appended to the refreshed list,
+        // interleaving two page sequences, so the refresh replaces it.
+        loadJob?.cancel()
         launchNow {
             isRefreshing = true
             try {
@@ -91,11 +108,19 @@ class MoviePager(
                 endReached = page.isEmpty() || lastPage <= 1
                 nextPage = 2
                 error = null
+                refreshError = null
                 refreshCount++
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (throwable: Throwable) {
-                error = throwable
+                if (movies.isEmpty()) {
+                    // Nothing on screen to keep: this is the screen's error,
+                    // and its retry asks for the first page again.
+                    nextPage = 1
+                    error = throwable
+                } else {
+                    refreshError = throwable
+                }
             } finally {
                 isRefreshing = false
             }
@@ -110,16 +135,23 @@ class MoviePager(
         error = null
     }
 
+    /** Drops a failed refresh once it has been reported. */
+    fun dismissRefreshError() {
+        refreshError = null
+    }
+
     /** Stops whatever this pager has in flight; for when a screen replaces it. */
     fun cancel() {
         job.cancel()
     }
 
     private fun load() {
-        launchNow {
+        loadJob = launchNow {
             isLoading = true
             try {
                 val response = fetch(nextPage, false)
+                // Replaced by a refresh while the page was on its way.
+                ensureActive()
                 val page = response.results.orEmpty()
                 // TMDB caps paging at 500 pages regardless of what total_pages says.
                 val lastPage = minOf(response.total_pages ?: nextPage, MAX_PAGE)
@@ -140,9 +172,8 @@ class MoviePager(
      * Runs [block] right away, up to its first suspension, so the flag it sets
      * is already up when this returns and an immediate second call is refused.
      */
-    private fun launchNow(block: suspend CoroutineScope.() -> Unit) {
+    private fun launchNow(block: suspend CoroutineScope.() -> Unit): Job =
         scope.launch(start = CoroutineStart.UNDISPATCHED, block = block)
-    }
 
     private companion object {
         const val MAX_PAGE = 500

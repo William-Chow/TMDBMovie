@@ -190,9 +190,10 @@ class MovieActivity : ComponentActivity() {
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
                 when {
                     // Nothing to load; say so rather than spinning forever.
+                    // Without a movie id a retry could only fail the same way.
                     viewModel.isUnavailable -> ErrorState(
                         message = stringResource(R.string.error_movie_unavailable),
-                        onRetry = { viewModel.retry() }
+                        onRetry = null
                     )
 
                     error != null -> ErrorState(

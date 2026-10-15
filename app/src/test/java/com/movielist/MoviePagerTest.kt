@@ -1,5 +1,6 @@
 package com.movielist
 
+import com.movielist.tmdb.network.model.Movie
 import com.movielist.tmdb.ui.MoviePager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -161,7 +162,7 @@ class MoviePagerTest {
     }
 
     @Test
-    fun refresh_isIgnoredWhileAPageIsLoading() = runTest {
+    fun refresh_isIgnoredWhileTheFirstPageIsLoading() = runTest {
         source.gate = CompletableDeferred()
         val pager = newPager()
         pager.loadNext()
@@ -173,7 +174,32 @@ class MoviePagerTest {
     }
 
     @Test
-    fun aFailedRefresh_keepsTheListItHad() = runTest {
+    fun refresh_whileANextPageIsLoading_replacesThatLoad() = runTest {
+        val pager = newPager()
+        pager.loadNext()
+        val gate = CompletableDeferred<Unit>().also { source.gate = it }
+        pager.loadNext()
+
+        pager.refresh()
+
+        assertTrue(pager.isRefreshing)
+        assertEquals(listOf(1 to false, 2 to false, 1 to true), source.calls)
+
+        gate.complete(Unit)
+        runCurrent()
+
+        assertFalse(pager.isLoading)
+        assertFalse(pager.isRefreshing)
+        assertEquals("the replaced page 2 is not appended", listOf(101, 102), pager.ids)
+
+        source.gate = null
+        pager.loadNext()
+        assertEquals(2 to false, source.calls.last())
+        assertEquals(listOf(101, 102, 201, 202), pager.ids)
+    }
+
+    @Test
+    fun aFailedRefresh_keepsTheListItHad_andPagingCarriesOn() = runTest {
         val pager = newPager()
         pager.loadNext()
         source.failure = IOException("offline")
@@ -181,9 +207,44 @@ class MoviePagerTest {
         pager.refresh()
 
         assertEquals(listOf(101, 102), pager.ids)
-        assertTrue(pager.error is IOException)
+        assertTrue(pager.refreshError is IOException)
+        assertNull("no page failed, so none is held back", pager.error)
         assertEquals(0, pager.refreshCount)
         assertFalse(pager.isRefreshing)
+
+        pager.dismissRefreshError()
+        source.failure = null
+        pager.loadNext()
+
+        assertNull(pager.refreshError)
+        assertEquals(listOf(101, 102, 201, 202), pager.ids)
+    }
+
+    @Test
+    fun aFailedRefresh_ofAnEmptyList_isTheScreensError_whoseRetryAsksForPageOne() = runTest {
+        var results = emptyList<Movie>()
+        var failure: Throwable? = null
+        val requestedPages = mutableListOf<Int>()
+        val pager = MoviePager(backgroundScope) { page, _ ->
+            requestedPages += page
+            failure?.let { throw it }
+            moviesPage(page, 1, results)
+        }
+        pager.loadNext()
+        assertTrue(pager.movies.isEmpty())
+
+        failure = IOException("offline")
+        pager.refresh()
+
+        assertTrue(pager.error is IOException)
+        assertNull(pager.refreshError)
+
+        failure = null
+        results = listOf(movie(7))
+        pager.retry()
+
+        assertEquals(listOf(1, 1, 1), requestedPages)
+        assertEquals(listOf(7), pager.ids)
     }
 
     @Test
